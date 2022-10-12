@@ -6,6 +6,7 @@ use owo_colors::{OwoColorize, Stream::Stdout};
 use crate::{PKGSTYLE, VERSIONSTYLE};
 
 pub fn remove(pkg: &str) -> Result<()> {
+    let pkgs = nix_data::cache::profile::getprofilepkgs()?;
     let currpkgs = nix_data::cache::profile::getprofilepkgs_versioned()?;
     if let Some(version) = currpkgs.get(pkg) {
         println!(
@@ -43,6 +44,37 @@ pub fn remove(pkg: &str) -> Result<()> {
                     version
                         .as_str()
                         .if_supports_color(Stdout, |t| t.style(*VERSIONSTYLE)),
+                );
+                Err(anyhow!("Failed to remove {}", pkg))
+            }
+        }
+    } else if pkgs.contains_key(pkg) {
+        println!(
+            "{} {}",
+            "Removing:".if_supports_color(Stdout, |t| t.bright_green()),
+            pkg.if_supports_color(Stdout, |t| t.style(*PKGSTYLE))
+        );
+        let status = Command::new("nix")
+            .arg("profile")
+            .arg("remove")
+            .arg("--impure")
+            // Change to match system
+            .arg(&format!("legacyPackages.x86_64-linux.{}", pkg))
+            .status()?;
+        match status {
+            s if s.success() => {
+                println!(
+                    "{} {}",
+                    "Successfully removed:".if_supports_color(Stdout, |t| t.bright_green()),
+                    pkg.if_supports_color(Stdout, |t| t.style(*PKGSTYLE))
+                );
+                Ok(())
+            }
+            _ => {
+                eprintln!(
+                    "{} failed to remove {}",
+                    "error:".if_supports_color(Stdout, |t| t.bright_red()),
+                    pkg.if_supports_color(Stdout, |t| t.style(*PKGSTYLE))
                 );
                 Err(anyhow!("Failed to remove {}", pkg))
             }
@@ -94,7 +126,7 @@ pub fn remove(pkg: &str) -> Result<()> {
             "{} {} {}",
             "Package".if_supports_color(Stdout, |t| t.bright_yellow()),
             pkg.if_supports_color(Stdout, |t| t.style(*PKGSTYLE)),
-            "is not installed".if_supports_color(Stdout, |t| t.bright_yellow())
+            "is not installed on the user profile".if_supports_color(Stdout, |t| t.bright_yellow())
         );
         Err(anyhow!("{} not found in profile", pkg))
     }
