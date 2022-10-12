@@ -16,7 +16,7 @@
         naersk-lib = naersk.lib."${system}";
       in
       {
-        packages.nixeditor = naersk-lib.buildPackage {
+        packages.snow = naersk-lib.buildPackage {
           pname = "snow";
           root = ./.;
           buildInputs = with pkgs; [
@@ -25,7 +25,7 @@
           ];
         };
 
-        defaultPackage = self.packages.${system}.nixeditor;
+        defaultPackage = self.packages.${system}.snow;
 
         devShell = pkgs.mkShell {
           buildInputs = with pkgs; [
