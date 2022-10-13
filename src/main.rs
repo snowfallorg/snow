@@ -46,6 +46,7 @@ enum Commands {
 }
 
 fn main() {
+    pretty_env_logger::init();
     let cli = Cli::parse();
 
     match cli.command {

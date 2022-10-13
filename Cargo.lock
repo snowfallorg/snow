@@ -681,8 +681,7 @@ dependencies = [
 [[package]]
 name = "nix-data"
 version = "0.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ce281b5358e756a8482cd047766a0915cbd341478c7919acab4bef19a5d27c1"
+source = "git+https://github.com/snowflakelinux/nix-data?branch=main#7b936396f4c92e89f8192c197de619a1fc8fb2e8"
 dependencies = [
  "anyhow",
  "ijson",
@@ -719,6 +718,7 @@ dependencies = [
  "nix-data",
  "nix-editor",
  "owo-colors",
+ "pretty_env_logger",
  "serde",
  "serde_json",
 ]
