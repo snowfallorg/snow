@@ -1,34 +1,43 @@
 use std::{
-    collections::HashMap,
-    fs::{self, File},
-    io::BufReader,
+    fs,
     process::Command,
 };
 
 use anyhow::{anyhow, Context, Result};
-use ijson::{IString, IValue};
 use owo_colors::{OwoColorize, Stream::Stdout};
+use sqlx::SqlitePool;
 
 use crate::PKGSTYLE;
 
-pub fn remove(pkgs: &[&str]) -> Result<()> {
-    let f = nix_data::cache::flakes::flakespkgs()?;
-    let data: HashMap<IString, IValue> =
-        serde_json::from_reader(BufReader::new(File::open(f)?)).unwrap();
+pub async fn remove(pkgs: &[&str]) -> Result<()> {
+    // let f = nix_data::cache::flakes::flakespkgs().await?;
+    let dbfile = nix_data::cache::flakes::flakespkgs().await?;
+    let db = format!("sqlite://{}", dbfile);
+    let pool = SqlitePool::connect(&db).await?;
+
+    // let data: HashMap<IString, IValue> =
+    //     serde_json::from_reader(BufReader::new(File::open(f)?)).unwrap();
+    let mut removepkgs = Vec::new();
     for pkg in pkgs {
-        if !data.contains_key(&IString::from(pkg.to_string())) {
+        let p: Result<(String,), sqlx::Error> =
+            sqlx::query_as("SELECT attribute FROM pkgs WHERE attribute LIKE $1")
+                .bind(pkg)
+                .fetch_one(&pool)
+                .await;
+        if let Ok((_,)) = p {
+            removepkgs.push(pkg.to_string());
+        } else {
             eprintln!(
                 "{} package {} not found",
                 "error:".if_supports_color(Stdout, |t| t.bright_red()),
                 pkg.if_supports_color(Stdout, |t| t.style(*PKGSTYLE))
             );
-            return Err(anyhow!("Package {} not found", pkg));
         }
     }
     println!(
         "{} {}",
         "Removing:".if_supports_color(Stdout, |t| t.bright_green()),
-        pkgs.join(" ")
+        removepkgs.join(" ")
             .if_supports_color(Stdout, |t| t.style(*PKGSTYLE)),
     );
 
@@ -38,14 +47,14 @@ pub fn remove(pkgs: &[&str]) -> Result<()> {
     let flakearg = config.flakearg;
 
     let oldconfig = fs::read_to_string(&configfile)?;
-    let currinstalled = nix_data::cache::flakes::getflakepkgs(&[&configfile])?;
-    let mut newinstall = vec![];
-    for p in pkgs {
+    let currinstalled = nix_data::cache::flakes::getflakepkgs(&[&configfile]).await?;
+    let mut newremove = vec![];
+    for p in &removepkgs {
         if currinstalled.contains_key(&p.to_string()) {
-            newinstall.push(p.to_string());
+            newremove.push(p.to_string());
         }
     }
-    if newinstall.is_empty() {
+    if newremove.is_empty() {
         println!(
             "{}",
             "No packages to remove".if_supports_color(Stdout, |t| t.bright_yellow())
@@ -53,7 +62,7 @@ pub fn remove(pkgs: &[&str]) -> Result<()> {
         return Ok(());
     }
 
-    let newconfig = nix_editor::write::rmarr(&oldconfig, "environment.systemPackages", newinstall)?;
+    let newconfig = nix_editor::write::rmarr(&oldconfig, "environment.systemPackages", newremove)?;
     fs::write(&configfile, newconfig)?;
     let status = Command::new("sudo")
         .arg("nixos-rebuild")
@@ -70,7 +79,7 @@ pub fn remove(pkgs: &[&str]) -> Result<()> {
             println!(
                 "{} {}",
                 "Successfully removed:".if_supports_color(Stdout, |t| t.bright_green()),
-                pkgs.iter()
+                removepkgs.iter()
                     .map(|x| x.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
@@ -82,7 +91,7 @@ pub fn remove(pkgs: &[&str]) -> Result<()> {
             eprintln!(
                 "{} failed to remove {}",
                 "error:".if_supports_color(Stdout, |t| t.bright_red()),
-                pkgs.iter()
+                removepkgs.iter()
                     .map(|x| x.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
@@ -92,7 +101,7 @@ pub fn remove(pkgs: &[&str]) -> Result<()> {
             fs::write(&configfile, oldconfig)?;
             Err(anyhow!(
                 "Failed to remove {}",
-                pkgs.iter()
+                removepkgs.iter()
                     .map(|x| x.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")

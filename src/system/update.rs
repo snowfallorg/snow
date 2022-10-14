@@ -3,7 +3,7 @@ use std::process::Command;
 use anyhow::{anyhow, Context, Result};
 use owo_colors::{OwoColorize, Stream::Stdout};
 
-pub fn update() -> Result<()> {
+pub async fn update() -> Result<()> {
     println!(
         "{}",
         "Updating".if_supports_color(Stdout, |t| t.bright_green())
