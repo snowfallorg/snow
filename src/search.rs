@@ -4,33 +4,36 @@ use anyhow::Result;
 use owo_colors::{OwoColorize, Stream::Stdout};
 use sqlx::{QueryBuilder, Sqlite, SqlitePool};
 
+use crate::VERSIONSTYLE;
+
 pub async fn search(query: &[&str]) -> Result<()> {
     let dbfile = nix_data::cache::nixos::nixospkgs().await?;
     let db = format!("sqlite://{}", dbfile);
     let pool = SqlitePool::connect(&db).await?;
 
     let mut queryb: QueryBuilder<Sqlite> = QueryBuilder::new(
-        "SELECT attribute, description, broken, insecure, unsupported, unfree FROM meta WHERE ",
+        "SELECT pkgs.attribute, description, broken, insecure, unsupported, unfree, version FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE ",
     );
     for (i, q) in query.iter().enumerate() {
         if i == query.len() - 1 {
             queryb
-                .push(r#"attribute LIKE "#)
+                .push(r#"pkgs.attribute LIKE "#)
                 .push_bind(format!("%{}%", q))
                 .push(r#" OR description LIKE "#)
                 .push_bind(format!("%{}%", q));
         } else {
             queryb
-                .push(r#"attribute LIKE "#)
+                .push(r#"pkgs.attribute LIKE "#)
                 .push_bind(format!("%{}%", q))
                 .push(r#" OR description LIKE "#)
                 .push_bind(format!("%{}%", q))
                 .push(r#" OR "#);
         }
     }
-    let q: Vec<(String, String, u8, u8, u8, u8)> = queryb.build_query_as().fetch_all(&pool).await.unwrap();
+    let q: Vec<(String, String, u8, u8, u8, u8, String)> =
+        queryb.build_query_as().fetch_all(&pool).await.unwrap();
     let mut outlist = Vec::new();
-    for (attr, desc, broken, insecure, unsupported, unfree) in q {
+    for (attr, desc, broken, insecure, unsupported, unfree, version) in q {
         outlist.push((
             attr,
             desc,
@@ -38,6 +41,7 @@ pub async fn search(query: &[&str]) -> Result<()> {
             insecure != 0,
             unsupported != 0,
             unfree != 0,
+            version,
         ));
     }
 
@@ -52,7 +56,7 @@ pub async fn search(query: &[&str]) -> Result<()> {
         Ok(HashMap::new())
     }?;
 
-    outlist.sort_by(|(apkg, _, _, _, _, _), (bpkg, _, _, _, _, _)| {
+    outlist.sort_by(|(apkg, _, _, _, _, _, _), (bpkg, _, _, _, _, _, _)| {
         let mut aleft = apkg.to_lowercase();
         let mut bleft = bpkg.to_lowercase();
         for q in query {
@@ -71,7 +75,7 @@ pub async fn search(query: &[&str]) -> Result<()> {
         bleft.len().cmp(&aleft.len())
     });
 
-    for (pkg, desc, broken, insecure, unsupported, unfree) in outlist {
+    for (pkg, desc, broken, insecure, unsupported, unfree, version) in outlist {
         let p = pkg.to_string();
         let mut pkg = p
             .if_supports_color(Stdout, |t| {
@@ -103,6 +107,13 @@ pub async fn search(query: &[&str]) -> Result<()> {
         }
         if currsyspkgs.contains_key(&p) {
             pkg = format!("{} ({})", pkg, "system".bright_magenta());
+        }
+        if !version.is_empty() {
+            pkg = format!(
+                "{} ({})",
+                pkg,
+                version.if_supports_color(Stdout, |t| t.style(*VERSIONSTYLE))
+            );
         }
         if broken {
             pkg = format!(
