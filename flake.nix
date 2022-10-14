@@ -19,24 +19,30 @@
         packages.snow = naersk-lib.buildPackage {
           pname = "snow";
           root = ./.;
+          nativeBuildInputs = with pkgs; [ makeWrapper ];
           buildInputs = with pkgs; [
             openssl
             pkg-config
+            sqlite
           ];
+          postInstall = ''
+            wrapProgram $out/bin/snow --prefix PATH : '${pkgs.lib.makeBinPath [ pkgs.sqlite ]}'
+          '';
         };
 
         defaultPackage = self.packages.${system}.snow;
 
         devShell = pkgs.mkShell {
           buildInputs = with pkgs; [
-            rust-analyzer
-            rustc
-            rustfmt
             cargo
             cargo-tarpaulin
             clippy
             openssl
             pkg-config
+            rust-analyzer
+            rustc
+            rustfmt
+            sqlite
           ];
         };
       });

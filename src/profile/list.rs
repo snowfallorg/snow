@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 
-pub fn list() -> Result<HashMap<String, String>> {
-    let currpkgs = nix_data::cache::profile::getprofilepkgs_versioned()?;
+pub async fn list() -> Result<HashMap<String, String>> {
+    let currpkgs = nix_data::cache::profile::getprofilepkgs_versioned().await?;
     let allpkgs = nix_data::cache::profile::getprofilepkgs()?;
     let mut list = HashMap::new();
     for (pkg, prof) in allpkgs {

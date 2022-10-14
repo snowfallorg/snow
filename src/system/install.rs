@@ -1,34 +1,44 @@
 use std::{
-    collections::HashMap,
-    fs::{self, File},
-    io::BufReader,
-    process::Command,
+    process::Command, fs,
 };
-
 use anyhow::{anyhow, Context, Result};
-use ijson::{IString, IValue};
 use owo_colors::{OwoColorize, Stream::Stdout};
+use sqlx::SqlitePool;
 
 use crate::PKGSTYLE;
 
-pub fn install(pkgs: &[&str]) -> Result<()> {
-    let f = nix_data::cache::flakes::flakespkgs()?;
-    let data: HashMap<IString, IValue> =
-        serde_json::from_reader(BufReader::new(File::open(f)?)).unwrap();
+pub async fn install(pkgs: &[&str]) -> Result<()> {
+    let dbfile = nix_data::cache::flakes::flakespkgs().await?;
+    let db = format!("sqlite://{}", dbfile);
+    let pool = SqlitePool::connect(&db).await?;
+
+    let mut installpkgs = Vec::new();
     for pkg in pkgs {
-        if !data.contains_key(&IString::from(pkg.to_string())) {
+        let p: Result<(String,), sqlx::Error> =
+            sqlx::query_as("SELECT attribute FROM pkgs WHERE attribute LIKE $1")
+                .bind(pkg)
+                .fetch_one(&pool)
+                .await;
+        if let Ok((_,)) = p {
+            installpkgs.push(pkg.to_string());
+        } else {
             eprintln!(
                 "{} package {} not found",
                 "error:".if_supports_color(Stdout, |t| t.bright_red()),
                 pkg.if_supports_color(Stdout, |t| t.style(*PKGSTYLE))
             );
-            return Err(anyhow!("Package {} not found", pkg));
         }
     }
+
+    if installpkgs.is_empty() {
+        return Err(anyhow!("No packages found"));
+    }
+
     println!(
         "{} {}",
         "Installing:".if_supports_color(Stdout, |t| t.bright_green()),
-        pkgs.join(" ")
+        installpkgs
+            .join(" ")
             .if_supports_color(Stdout, |t| t.style(*PKGSTYLE)),
     );
 
@@ -38,9 +48,9 @@ pub fn install(pkgs: &[&str]) -> Result<()> {
     let flakearg = config.flakearg;
 
     let oldconfig = fs::read_to_string(&configfile)?;
-    let currinstalled = nix_data::cache::flakes::getflakepkgs(&[&configfile])?;
+    let currinstalled = nix_data::cache::flakes::getflakepkgs(&[&configfile]).await?;
     let mut newinstall = vec![];
-    for p in pkgs {
+    for p in &installpkgs {
         if !currinstalled.contains_key(&p.to_string()) {
             newinstall.push(p.to_string());
         }
@@ -71,7 +81,7 @@ pub fn install(pkgs: &[&str]) -> Result<()> {
             println!(
                 "{} {}",
                 "Successfully installed:".if_supports_color(Stdout, |t| t.bright_green()),
-                pkgs.iter()
+                installpkgs.iter()
                     .map(|x| x.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
@@ -83,7 +93,7 @@ pub fn install(pkgs: &[&str]) -> Result<()> {
             eprintln!(
                 "{} failed to install {}",
                 "error:".if_supports_color(Stdout, |t| t.bright_red()),
-                pkgs.iter()
+                installpkgs.iter()
                     .map(|x| x.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
@@ -93,7 +103,7 @@ pub fn install(pkgs: &[&str]) -> Result<()> {
             fs::write(&configfile, oldconfig)?;
             Err(anyhow!(
                 "Failed to install {}",
-                pkgs.iter()
+                installpkgs.iter()
                     .map(|x| x.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")

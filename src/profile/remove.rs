@@ -5,9 +5,9 @@ use owo_colors::{OwoColorize, Stream::Stdout};
 
 use crate::{PKGSTYLE, VERSIONSTYLE};
 
-pub fn remove(pkg: &str) -> Result<()> {
-    let pkgs = nix_data::cache::profile::getprofilepkgs()?;
-    let currpkgs = nix_data::cache::profile::getprofilepkgs_versioned()?;
+pub async fn remove(pkg: &str) -> Result<()> {
+    let pkgs = nix_data::cache::profile::getprofilepkgs().unwrap();
+    let currpkgs = nix_data::cache::profile::getprofilepkgs_versioned().await.unwrap();
     if let Some(version) = currpkgs.get(pkg) {
         println!(
             "{} {} ({})",
@@ -48,7 +48,7 @@ pub fn remove(pkg: &str) -> Result<()> {
                 Err(anyhow!("Failed to remove {}", pkg))
             }
         }
-    } else if pkgs.contains_key(pkg) {
+    } else if pkgs.get(pkg).map(|x| x.originalurl.to_string()) == Some(String::from("flake:nixpkgs")) {
         println!(
             "{} {}",
             "Removing:".if_supports_color(Stdout, |t| t.bright_green()),

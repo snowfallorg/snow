@@ -45,7 +45,8 @@ enum Commands {
     },
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     pretty_env_logger::init();
     let cli = Cli::parse();
 
@@ -53,12 +54,12 @@ fn main() {
         Commands::Install { packages, system } => {
             if system {
                 let p: Vec<&str> = packages.iter().map(|x| &**x).collect();
-                if system::install::install(&p).is_err() {
+                if system::install::install(&p).await.is_err() {
                     exit(1)
                 }
             } else {
                 for pkg in packages {
-                    if profile::install::install(&pkg).is_err() {
+                    if profile::install::install(&pkg).await.is_err() {
                         exit(1)
                     }
                 }
@@ -67,12 +68,12 @@ fn main() {
         Commands::Remove { packages, system } => {
             if system {
                 let p: Vec<&str> = packages.iter().map(|x| &**x).collect();
-                if system::remove::remove(&p).is_err() {
+                if system::remove::remove(&p).await.is_err() {
                     exit(1)
                 }
             } else {
                 for pkg in packages {
-                    let _ = profile::remove::remove(&pkg);
+                    let _ = profile::remove::remove(&pkg).await;
                 }
             }
         }
@@ -89,7 +90,7 @@ fn main() {
                         "warning:".if_supports_color(Stdout, |t| t.bright_yellow())
                     );
                 }
-                if system::update::update().is_err() {
+                if system::update::update().await.is_err() {
                     exit(1)
                 }
                 if profile::update::updateall().is_err() {
@@ -103,12 +104,12 @@ fn main() {
                         "warning:".if_supports_color(Stdout, |t| t.bright_yellow())
                     );
                 }
-                if system::update::update().is_err() {
+                if system::update::update().await.is_err() {
                     exit(1)
                 }
             } else if let Some(pkgs) = packages {
                 for pkg in pkgs {
-                    let _ = profile::update::update(&pkg);
+                    let _ = profile::update::update(&pkg).await;
                 }
             } else if profile::update::updateall().is_err() {
                 exit(1)
@@ -150,14 +151,14 @@ fn main() {
                 }
             }
             if profile {
-                let lst = profile::list::list();
+                let lst = profile::list::list().await;
                 printprofilelist(lst);
             } else if system {
-                let lst = nix_snow::system::list::list();
+                let lst = nix_snow::system::list::list().await;
                 printsystemlist(lst);
             } else {
-                let lst = profile::list::list();
-                let syslst = nix_snow::system::list::list();
+                let lst = profile::list::list().await;
+                let syslst = nix_snow::system::list::list().await;
                 println!(
                     "{}",
                     "Profile Packages:".if_supports_color(Stdout, |t| t.bright_cyan())
@@ -177,7 +178,7 @@ fn main() {
                 exit(1);
             }
             let query: Vec<&str> = query.iter().map(|x| &**x).collect();
-            if nix_snow::search::search(&query).is_err() {
+            if nix_snow::search::search(&query).await.is_err() {
                 exit(1)
             };
         }
