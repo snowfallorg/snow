@@ -956,7 +956,7 @@ dependencies = [
 [[package]]
 name = "nix-data"
 version = "0.0.2"
-source = "git+https://github.com/snowflakelinux/nix-data?branch=sqltest#8e9d3bd8a51f92d12e477a7faf3b13054160ec05"
+source = "git+https://github.com/snowflakelinux/nix-data?branch=main#41afc93336877c64e75e4ddd87ae2a043d104782"
 dependencies = [
  "anyhow",
  "csv",
