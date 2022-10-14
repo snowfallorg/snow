@@ -12,7 +12,7 @@ pub async fn search(query: &[&str]) -> Result<()> {
     let pool = SqlitePool::connect(&db).await?;
 
     let mut queryb: QueryBuilder<Sqlite> = QueryBuilder::new(
-        "SELECT pkgs.attribute, description, broken, insecure, unsupported, unfree, version FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE ",
+        "SELECT pkgs.attribute, description, broken, insecure, unsupported, unfree, version FROM pkgs JOIN meta ON (pkgs.attribute = meta.attribute) WHERE (",
     );
     for (i, q) in query.iter().enumerate() {
         if i == query.len() - 1 {
@@ -20,14 +20,15 @@ pub async fn search(query: &[&str]) -> Result<()> {
                 .push(r#"pkgs.attribute LIKE "#)
                 .push_bind(format!("%{}%", q))
                 .push(r#" OR description LIKE "#)
-                .push_bind(format!("%{}%", q));
+                .push_bind(format!("%{}%", q))
+                .push(")");
         } else {
             queryb
                 .push(r#"pkgs.attribute LIKE "#)
                 .push_bind(format!("%{}%", q))
                 .push(r#" OR description LIKE "#)
                 .push_bind(format!("%{}%", q))
-                .push(r#" OR "#);
+                .push(r#") AND ("#);
         }
     }
     let q: Vec<(String, String, u8, u8, u8, u8, String)> =
