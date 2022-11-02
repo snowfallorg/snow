@@ -1,5 +1,4 @@
-use std::process::Command;
-
+use std::{process::Command, path::Path};
 use anyhow::{anyhow, Context, Result};
 use owo_colors::{OwoColorize, Stream::Stdout};
 
@@ -30,16 +29,37 @@ pub async fn update() -> Result<()> {
         }
     }
 
-    let status = Command::new("sudo")
-        .arg("nixos-rebuild")
+    let exe = match std::env::current_exe() {
+        Ok(mut e) => {
+            e.pop(); // root/bin
+            e.pop(); // root/
+            e.push("libexec"); // root/libexec
+            e.push("snow-helper");
+            let x = e.to_string_lossy().to_string();
+            if Path::new(&x).is_file() {
+                x
+            } else {
+                String::from("snow-helper")
+            }
+        }
+        Err(_) => String::from("snow-helper"),
+    };
+
+    let mut writecmd = Command::new("sudo")
+        .arg(&exe)
+        .arg("update")
+        .arg("--flake")
+        .arg(&flakefile)
+        .arg("--")
         .arg("switch")
         .arg("--flake")
-        .arg(if let Some(arg) = flakearg {
-            format!("{}#{}", flakefile, arg)
-        } else {
-            flakefile
-        })
-        .status();
+        .arg(if let Some(arg) = flakearg { format!("{}#{}", flakefile, arg) } else { flakefile })
+        .arg("--impure")
+        .spawn()?;
+    writecmd.wait().unwrap();
+
+    let status = writecmd.wait();
+
     match status {
         Ok(s) if s.success() => {
             println!(

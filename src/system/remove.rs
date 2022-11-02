@@ -1,6 +1,6 @@
 use std::{
     fs,
-    process::Command,
+    process::{Command, Stdio}, io::Write, path::Path,
 };
 
 use anyhow::{anyhow, Context, Result};
@@ -63,17 +63,46 @@ pub async fn remove(pkgs: &[&str]) -> Result<()> {
     }
 
     let newconfig = nix_editor::write::rmarr(&oldconfig, "environment.systemPackages", newremove)?;
-    fs::write(&configfile, newconfig)?;
-    let status = Command::new("sudo")
-        .arg("nixos-rebuild")
+  
+    let exe = match std::env::current_exe() {
+        Ok(mut e) => {
+            e.pop(); // root/bin
+            e.pop(); // root/
+            e.push("libexec"); // root/libexec
+            e.push("snow-helper");
+            let x = e.to_string_lossy().to_string();
+            if Path::new(&x).is_file() {
+                x
+            } else {
+                String::from("snow-helper")
+            }
+        }
+        Err(_) => String::from("snow-helper"),
+    };
+
+    let mut writecmd = Command::new("sudo")
+        .arg(&exe)
+        .arg("config")
+        .arg("--output")
+        .arg(&configfile)
+        .arg("--")
         .arg("switch")
         .arg("--flake")
-        .arg(if let Some(arg) = flakearg {
-            format!("{}#{}", flakefile, arg)
-        } else {
-            flakefile
-        })
-        .status();
+        .arg(if let Some(arg) = flakearg { format!("{}#{}", flakefile, arg) } else { flakefile })
+        .arg("--impure")
+        .stdin(Stdio::piped())
+        .spawn()?;
+    writecmd
+        .stdin
+        .as_mut()
+        .ok_or("stdin not available")
+        .unwrap()
+        .write_all(newconfig.as_bytes())
+        .unwrap();
+    writecmd.wait().unwrap();
+
+    let status = writecmd.wait();
+
     match status {
         Ok(s) if s.success() => {
             println!(
@@ -97,8 +126,6 @@ pub async fn remove(pkgs: &[&str]) -> Result<()> {
                     .join(", ")
                     .if_supports_color(Stdout, |t| t.style(*PKGSTYLE)),
             );
-            // Restore old config
-            fs::write(&configfile, oldconfig)?;
             Err(anyhow!(
                 "Failed to remove {}",
                 removepkgs.iter()

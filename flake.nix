@@ -27,6 +27,8 @@
           ];
           postInstall = ''
             wrapProgram $out/bin/snow --prefix PATH : '${pkgs.lib.makeBinPath [ pkgs.sqlite ]}'
+            mkdir -p $out/libexec
+            mv $out/bin/snow-helper $out/libexec/snow-helper
           '';
         };
 
