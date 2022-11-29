@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::process::exit;
 
 use clap::{ArgGroup, Parser, Subcommand};
-use nix_snow::VERSIONSTYLE;
 use nix_snow::{profile, system};
+use nix_snow::{ERRORSTYLE, VERSIONSTYLE};
 use owo_colors::{OwoColorize, Stream::Stdout};
 
 #[derive(Parser)]
@@ -43,6 +43,10 @@ enum Commands {
     Search {
         query: Vec<String>,
     },
+    Run {
+        package: String,
+        arguments: Vec<String>,
+    },
 }
 
 #[tokio::main]
@@ -54,12 +58,22 @@ async fn main() {
         Commands::Install { packages, system } => {
             if system {
                 let p: Vec<&str> = packages.iter().map(|x| &**x).collect();
-                if system::install::install(&p).await.is_err() {
+                if let Err(e) = system::install::install(&p).await {
+                    eprintln!(
+                        "{} {}",
+                        "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                        e
+                    );
                     exit(1)
                 }
             } else {
                 for pkg in packages {
-                    if profile::install::install(&pkg).await.is_err() {
+                    if let Err(e) = profile::install::install(&pkg).await {
+                        eprintln!(
+                            "{} {}",
+                            "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                            e
+                        );
                         exit(1)
                     }
                 }
@@ -104,7 +118,12 @@ async fn main() {
                         "warning:".if_supports_color(Stdout, |t| t.bright_yellow())
                     );
                 }
-                if system::update::update().await.is_err() {
+                if let Err(e) = system::update::update().await {
+                    eprintln!(
+                        "{} {}",
+                        "error:".if_supports_color(Stdout, |t| t.bright_red().bold().to_string()),
+                        e
+                    );
                     exit(1)
                 }
             } else if let Some(pkgs) = packages {
@@ -174,13 +193,21 @@ async fn main() {
         }
         Commands::Search { query } => {
             if query.is_empty() {
-                println!("{} No search query provided", "error:".if_supports_color(Stdout, |t| t.red()));
+                println!(
+                    "{} No search query provided",
+                    "error:".if_supports_color(Stdout, |t| t.red())
+                );
                 exit(1);
             }
             let query: Vec<&str> = query.iter().map(|x| &**x).collect();
             if nix_snow::search::search(&query).await.is_err() {
                 exit(1)
             };
+        }
+        Commands::Run { package, arguments } => {
+            if profile::run::run(&package, arguments).await.is_err() {
+                exit(1)
+            }
         }
     }
 }
