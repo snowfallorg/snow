@@ -82,6 +82,18 @@ Options:
   -h, --help  Print help information
 ```
 
+## Run a package not currently installed
+```
+Usage: snow run <PACKAGE> [ARGUMENTS]...
+
+Arguments:
+  <PACKAGE>       
+  [ARGUMENTS]...  
+
+Options:
+  -h, --help  Print help information
+```
+
 [builtwithnix badge]: https://img.shields.io/badge/Built%20With-Nix-41439A?style=for-the-badge&logo=nixos&logoColor=white
 [builtwithnix]: https://builtwithnix.org/
 [MIT badge]: https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge
