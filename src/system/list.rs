@@ -12,6 +12,7 @@ pub async fn list() -> Result<HashMap<String, Option<String>>> {
     )?;
     let mut list = HashMap::new();
     for pkg in allpkgs {
+        let pkg = pkg.strip_prefix("pkgs.").unwrap_or(&pkg).to_string();
         if let Some(version) = currpkgs.get(&pkg) {
             list.insert(pkg, Some(version.to_string()));
         } else {

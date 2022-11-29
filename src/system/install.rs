@@ -1,9 +1,12 @@
-use std::{
-    process::{Command, Stdio}, fs, path::Path, io::Write,
-};
 use anyhow::{anyhow, Context, Result};
 use owo_colors::{OwoColorize, Stream::Stdout};
 use sqlx::SqlitePool;
+use std::{
+    fs,
+    io::Write,
+    path::Path,
+    process::{Command, Stdio},
+};
 
 use crate::PKGSTYLE;
 
@@ -49,10 +52,23 @@ pub async fn install(pkgs: &[&str]) -> Result<()> {
 
     let oldconfig = fs::read_to_string(&configfile)?;
     let currinstalled = nix_data::cache::flakes::getflakepkgs(&[&configfile]).await?;
+
+    let haswithpkgs = if let Ok(withvals) =
+        nix_editor::read::getwithvalue(&oldconfig, "environment.systemPackages")
+    {
+        withvals.contains(&String::from("pkgs"))
+    } else {
+        false
+    };
+
     let mut newinstall = vec![];
     for p in &installpkgs {
         if !currinstalled.contains_key(&p.to_string()) {
-            newinstall.push(p.to_string());
+            if haswithpkgs {
+                newinstall.push(p.to_string());
+            } else {
+                newinstall.push(format!("pkgs.{}", p));
+            }
         }
     }
     if newinstall.is_empty() {
@@ -87,10 +103,16 @@ pub async fn install(pkgs: &[&str]) -> Result<()> {
         .arg("config")
         .arg("--output")
         .arg(&configfile)
+        .arg("--generations")
+        .arg(config.generations.unwrap_or(0).to_string())
         .arg("--")
         .arg("switch")
         .arg("--flake")
-        .arg(if let Some(arg) = flakearg { format!("{}#{}", flakefile, arg) } else { flakefile })
+        .arg(if let Some(arg) = flakearg {
+            format!("{}#{}", flakefile, arg)
+        } else {
+            flakefile
+        })
         .arg("--impure")
         .stdin(Stdio::piped())
         .spawn()?;
@@ -110,7 +132,8 @@ pub async fn install(pkgs: &[&str]) -> Result<()> {
             println!(
                 "{} {}",
                 "Successfully installed:".if_supports_color(Stdout, |t| t.bright_green()),
-                installpkgs.iter()
+                installpkgs
+                    .iter()
                     .map(|x| x.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
@@ -122,7 +145,8 @@ pub async fn install(pkgs: &[&str]) -> Result<()> {
             eprintln!(
                 "{} failed to install {}",
                 "error:".if_supports_color(Stdout, |t| t.bright_red()),
-                installpkgs.iter()
+                installpkgs
+                    .iter()
                     .map(|x| x.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
@@ -130,7 +154,8 @@ pub async fn install(pkgs: &[&str]) -> Result<()> {
             );
             Err(anyhow!(
                 "Failed to install {}",
-                installpkgs.iter()
+                installpkgs
+                    .iter()
                     .map(|x| x.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")

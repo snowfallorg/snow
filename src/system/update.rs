@@ -1,6 +1,6 @@
-use std::{process::Command, path::Path};
 use anyhow::{anyhow, Context, Result};
 use owo_colors::{OwoColorize, Stream::Stdout};
+use std::{path::Path, process::Command};
 
 pub async fn update() -> Result<()> {
     println!(
@@ -11,23 +11,6 @@ pub async fn update() -> Result<()> {
     let config = nix_data::config::configfile::getconfig()?;
     let flakefile = config.flake.context("Failed to get flake file")?;
     let flakearg = config.flakearg;
-
-    let flakestatus = Command::new("sudo")
-        .arg("nix")
-        .arg("flake")
-        .arg("update")
-        .arg(&flakefile)
-        .status();
-    match flakestatus {
-        Ok(status) => {
-            if !status.success() {
-                return Err(anyhow!("Failed to update flake"));
-            }
-        }
-        Err(e) => {
-            return Err(anyhow!("Failed to update flake: {}", e));
-        }
-    }
 
     let exe = match std::env::current_exe() {
         Ok(mut e) => {
@@ -50,13 +33,18 @@ pub async fn update() -> Result<()> {
         .arg("update")
         .arg("--flake")
         .arg(&flakefile)
+        .arg("--generations")
+        .arg(config.generations.unwrap_or(0).to_string())
         .arg("--")
         .arg("switch")
         .arg("--flake")
-        .arg(if let Some(arg) = flakearg { format!("{}#{}", flakefile, arg) } else { flakefile })
+        .arg(if let Some(arg) = flakearg {
+            format!("{}#{}", flakefile, arg)
+        } else {
+            flakefile
+        })
         .arg("--impure")
         .spawn()?;
-    writecmd.wait().unwrap();
 
     let status = writecmd.wait();
 
@@ -80,10 +68,6 @@ pub async fn update() -> Result<()> {
             Ok(())
         }
         _ => {
-            eprintln!(
-                "{} failed to update",
-                "error:".if_supports_color(Stdout, |t| t.bright_red())
-            );
             Err(anyhow!("Failed to update system"))
         }
     }

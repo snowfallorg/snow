@@ -1,6 +1,8 @@
 use std::{
     fs,
-    process::{Command, Stdio}, io::Write, path::Path,
+    io::Write,
+    path::Path,
+    process::{Command, Stdio},
 };
 
 use anyhow::{anyhow, Context, Result};
@@ -37,7 +39,8 @@ pub async fn remove(pkgs: &[&str]) -> Result<()> {
     println!(
         "{} {}",
         "Removing:".if_supports_color(Stdout, |t| t.bright_green()),
-        removepkgs.join(" ")
+        removepkgs
+            .join(" ")
             .if_supports_color(Stdout, |t| t.style(*PKGSTYLE)),
     );
 
@@ -62,8 +65,20 @@ pub async fn remove(pkgs: &[&str]) -> Result<()> {
         return Ok(());
     }
 
-    let newconfig = nix_editor::write::rmarr(&oldconfig, "environment.systemPackages", newremove)?;
-  
+    let envsyspkgs = nix_editor::read::getarrvals(&oldconfig, "environment.systemPackages")?;
+    let mut finalremove =  vec![];
+
+    for p in &newremove {
+        if envsyspkgs.contains(&p.to_string()) {
+            finalremove.push(p.to_string());
+        }
+        if envsyspkgs.contains(&format!("pkgs.{}", p)) {
+            finalremove.push(format!("pkgs.{}", p));
+        }
+    }
+
+    let newconfig = nix_editor::write::rmarr(&oldconfig, "environment.systemPackages", finalremove)?;
+
     let exe = match std::env::current_exe() {
         Ok(mut e) => {
             e.pop(); // root/bin
@@ -85,10 +100,16 @@ pub async fn remove(pkgs: &[&str]) -> Result<()> {
         .arg("config")
         .arg("--output")
         .arg(&configfile)
+        .arg("--generations")
+        .arg(config.generations.unwrap_or(0).to_string())
         .arg("--")
         .arg("switch")
         .arg("--flake")
-        .arg(if let Some(arg) = flakearg { format!("{}#{}", flakefile, arg) } else { flakefile })
+        .arg(if let Some(arg) = flakearg {
+            format!("{}#{}", flakefile, arg)
+        } else {
+            flakefile
+        })
         .arg("--impure")
         .stdin(Stdio::piped())
         .spawn()?;
@@ -108,7 +129,8 @@ pub async fn remove(pkgs: &[&str]) -> Result<()> {
             println!(
                 "{} {}",
                 "Successfully removed:".if_supports_color(Stdout, |t| t.bright_green()),
-                removepkgs.iter()
+                removepkgs
+                    .iter()
                     .map(|x| x.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
@@ -120,7 +142,8 @@ pub async fn remove(pkgs: &[&str]) -> Result<()> {
             eprintln!(
                 "{} failed to remove {}",
                 "error:".if_supports_color(Stdout, |t| t.bright_red()),
-                removepkgs.iter()
+                removepkgs
+                    .iter()
                     .map(|x| x.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
@@ -128,7 +151,8 @@ pub async fn remove(pkgs: &[&str]) -> Result<()> {
             );
             Err(anyhow!(
                 "Failed to remove {}",
-                removepkgs.iter()
+                removepkgs
+                    .iter()
                     .map(|x| x.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")

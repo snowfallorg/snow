@@ -1,6 +1,6 @@
+use anyhow::{anyhow, Result};
 use clap::{self, FromArgMatches, Subcommand};
 use std::{
-    error::Error,
     fs::{self, File},
     io::{self, Read, Write},
     process::Command,
@@ -13,6 +13,10 @@ enum SubCommands {
         #[arg(short, long)]
         output: String,
 
+        /// How many generations to keep
+        #[arg(short, long)]
+        generations: Option<u32>,
+
         /// Run `nixos-rebuild` with the given arguments
         arguments: Vec<String>,
     },
@@ -21,6 +25,10 @@ enum SubCommands {
         #[arg(short, long)]
         flake: String,
 
+        /// How many generations to keep
+        #[arg(short, long)]
+        generations: Option<u32>,
+
         /// Run `nixos-rebuild` with the given arguments
         arguments: Vec<String>,
     },
@@ -28,7 +36,7 @@ enum SubCommands {
 
 fn main() {
     let cli = SubCommands::augment_subcommands(clap::Command::new(
-        "Helper binary for NixOS Configuration Editor",
+        "Helper binary for snow",
     ));
     let matches = cli.get_matches();
     let derived_subcommands = SubCommands::from_arg_matches(&matches)
@@ -36,13 +44,17 @@ fn main() {
         .unwrap();
 
     if users::get_effective_uid() != 0 {
-        eprintln!("nixos-conf-editor-helper must be run as root");
+        eprintln!("snow-helper must be run as root");
         std::process::exit(1);
     }
 
     match derived_subcommands {
-        SubCommands::Config { output, arguments } => {
-            match write_file(&output, arguments) {
+        SubCommands::Config {
+            output,
+            generations,
+            arguments
+        } => {
+            match write_file(&output, arguments, generations) {
                 Ok(_) => (),
                 Err(err) => {
                     eprintln!("{}", err);
@@ -50,7 +62,11 @@ fn main() {
                 }
             };
         }
-        SubCommands::Update { flake, arguments } => match update(&flake, arguments) {
+        SubCommands::Update {
+            flake,
+            generations,
+            arguments
+        } => match update(&flake, arguments, generations) {
             Ok(_) => (),
             Err(err) => {
                 eprintln!("{}", err);
@@ -60,7 +76,7 @@ fn main() {
     }
 }
 
-fn write_file(path: &str, args: Vec<String>) -> Result<(), Box<dyn Error>> {
+fn write_file(path: &str, args: Vec<String>, generations: Option<u32>) -> Result<()> {
     let backup = fs::read_to_string(path)?;
 
     let stdin = io::stdin();
@@ -69,25 +85,16 @@ fn write_file(path: &str, args: Vec<String>) -> Result<(), Box<dyn Error>> {
     let mut file = File::create(path)?;
     write!(file, "{}", &buf)?;
 
-    let mut cmd = Command::new("nixos-rebuild").args(args).spawn()?;
-    if let Ok(x) = cmd.wait() {
-        if x.success() {
-            Ok(())
-        } else {
-            let mut file = File::create(path)?;
-            write!(file, "{}", &backup)?;
-            eprintln!("nixos-rebuild failed with exit code {}", x.code().unwrap());
-            std::process::exit(1);
-        }
-    } else {
+    if rebuild(args, generations).is_err() {
         let mut file = File::create(path)?;
         write!(file, "{}", &backup)?;
-        eprintln!("nixos-rebuild failed");
-        std::process::exit(1);
+        Err(anyhow!("Failed to rebuild"))
+    } else {
+        Ok(())
     }
 }
 
-fn update(path: &str, args: Vec<String>) -> Result<(), Box<dyn Error>> {
+fn update(path: &str, args: Vec<String>, generations: Option<u32>) -> Result<()> {
     let mut cmd = Command::new("nix")
         .arg("flake")
         .arg("update")
@@ -101,13 +108,33 @@ fn update(path: &str, args: Vec<String>) -> Result<(), Box<dyn Error>> {
         );
         std::process::exit(1);
     }
+    rebuild(args, generations)
+}
 
+fn rebuild(args: Vec<String>, generations: Option<u32>) -> Result<()> {
     let mut cmd = Command::new("nixos-rebuild").args(args).spawn()?;
     let x = cmd.wait()?;
-    if x.success() {
-        Ok(())
-    } else {
+    if !x.success() {
         eprintln!("nixos-rebuild failed with exit code {}", x.code().unwrap());
-        std::process::exit(1);
+        return Err(anyhow!("nixos-rebuild failed"));
     }
+    if let Some(g) = generations {
+        if g > 0 {
+            let mut cmd = Command::new("nix-env")
+                .arg("--delete-generations")
+                .arg("-p")
+                .arg("/nix/var/nix/profiles/system")
+                .arg(&format!("+{}", g))
+                .spawn()?;
+            let x = cmd.wait()?;
+            if !x.success() {
+                eprintln!(
+                    "nix-env --delete-generations failed with exit code {}",
+                    x.code().unwrap()
+                );
+                return Err(anyhow!("nix-env failed"));
+            }
+        }
+    }
+    Ok(())
 }
