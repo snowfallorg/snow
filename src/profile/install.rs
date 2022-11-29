@@ -47,14 +47,10 @@ pub async fn install(pkg: &str) -> Result<()> {
                     );
                     Ok(())
                 }
-                _ => {
-                    eprintln!(
-                        "{} failed to install {}",
-                        "error:".if_supports_color(Stdout, |t| t.bright_red()),
-                        pkg.if_supports_color(Stdout, |t| t.style(*PKGSTYLE)),
-                    );
-                    Err(anyhow!("Failed to install {}", pkg))
-                }
+                _ => Err(anyhow!(
+                    "Failed to install {}",
+                    pkg.if_supports_color(Stdout, |t| t.style(*PKGSTYLE))
+                )),
             }
         } else {
             println!(
@@ -83,25 +79,19 @@ pub async fn install(pkg: &str) -> Result<()> {
                     );
                     Ok(())
                 }
-                _ => {
-                    eprintln!(
-                        "{} failed to install {} ({})",
-                        "error:".if_supports_color(Stdout, |t| t.bright_red()),
-                        pkg.if_supports_color(Stdout, |t| t.style(*PKGSTYLE)),
-                        version
-                            .as_str()
-                            .if_supports_color(Stdout, |t| t.style(*VERSIONSTYLE)),
-                    );
-                    Err(anyhow!("Failed to install {}", pkg))
-                }
+                _ => Err(anyhow!(
+                    "Failed to install {} ({})",
+                    pkg.if_supports_color(Stdout, |t| t.style(*PKGSTYLE)),
+                    version
+                        .as_str()
+                        .if_supports_color(Stdout, |t| t.style(*VERSIONSTYLE))
+                )),
             }
         }
     } else {
-        eprintln!(
-            "{} package {} not found",
-            "error:".if_supports_color(Stdout, |t| t.bright_red()),
+        Err(anyhow!(
+            "Package {} not found",
             pkg.if_supports_color(Stdout, |t| t.style(*PKGSTYLE))
-        );
-        Err(anyhow!("Package {} not found", pkg))
+        ))
     }
 }

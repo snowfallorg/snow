@@ -35,9 +35,7 @@ enum SubCommands {
 }
 
 fn main() {
-    let cli = SubCommands::augment_subcommands(clap::Command::new(
-        "Helper binary for snow",
-    ));
+    let cli = SubCommands::augment_subcommands(clap::Command::new("Helper binary for snow"));
     let matches = cli.get_matches();
     let derived_subcommands = SubCommands::from_arg_matches(&matches)
         .map_err(|err| err.exit())
@@ -52,7 +50,7 @@ fn main() {
         SubCommands::Config {
             output,
             generations,
-            arguments
+            arguments,
         } => {
             match write_file(&output, arguments, generations) {
                 Ok(_) => (),
@@ -65,7 +63,7 @@ fn main() {
         SubCommands::Update {
             flake,
             generations,
-            arguments
+            arguments,
         } => match update(&flake, arguments, generations) {
             Ok(_) => (),
             Err(err) => {

@@ -82,7 +82,12 @@ async fn main() {
         Commands::Remove { packages, system } => {
             if system {
                 let p: Vec<&str> = packages.iter().map(|x| &**x).collect();
-                if system::remove::remove(&p).await.is_err() {
+                if let Err(e) = system::remove::remove(&p).await {
+                    eprintln!(
+                        "{} {}",
+                        "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                        e
+                    );
                     exit(1)
                 }
             } else {
@@ -104,10 +109,20 @@ async fn main() {
                         "warning:".if_supports_color(Stdout, |t| t.bright_yellow())
                     );
                 }
-                if system::update::update().await.is_err() {
+                if let Err(e) = system::update::update().await {
+                    eprintln!(
+                        "{} {}",
+                        "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                        e
+                    );
                     exit(1)
                 }
-                if profile::update::updateall().is_err() {
+                if let Err(e) = profile::update::updateall() {
+                    eprintln!(
+                        "{} {}",
+                        "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                        e
+                    );
                     exit(1)
                 }
             } else if system {
@@ -130,7 +145,12 @@ async fn main() {
                 for pkg in pkgs {
                     let _ = profile::update::update(&pkg).await;
                 }
-            } else if profile::update::updateall().is_err() {
+            } else if let Err(e) = profile::update::updateall() {
+                eprintln!(
+                    "{} {}",
+                    "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                    e
+                );
                 exit(1)
             }
         }
@@ -200,12 +220,22 @@ async fn main() {
                 exit(1);
             }
             let query: Vec<&str> = query.iter().map(|x| &**x).collect();
-            if nix_snow::search::search(&query).await.is_err() {
+            if let Err(e) = nix_snow::search::search(&query).await {
+                eprintln!(
+                    "{} {}",
+                    "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                    e
+                );
                 exit(1)
             };
         }
         Commands::Run { package, arguments } => {
-            if profile::run::run(&package, arguments).await.is_err() {
+            if let Err(e) = profile::run::run(&package, arguments).await {
+                eprintln!(
+                    "{} {}",
+                    "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                    e
+                );
                 exit(1)
             }
         }

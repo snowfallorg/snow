@@ -8,7 +8,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crate::PKGSTYLE;
+use crate::{ERRORSTYLE, PKGSTYLE};
 
 pub async fn install(pkgs: &[&str]) -> Result<()> {
     let dbfile = nix_data::cache::flakes::flakespkgs().await?;
@@ -27,7 +27,7 @@ pub async fn install(pkgs: &[&str]) -> Result<()> {
         } else {
             eprintln!(
                 "{} package {} not found",
-                "error:".if_supports_color(Stdout, |t| t.bright_red()),
+                "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
                 pkg.if_supports_color(Stdout, |t| t.style(*PKGSTYLE))
             );
         }
@@ -141,25 +141,14 @@ pub async fn install(pkgs: &[&str]) -> Result<()> {
             );
             Ok(())
         }
-        _ => {
-            eprintln!(
-                "{} failed to install {}",
-                "error:".if_supports_color(Stdout, |t| t.bright_red()),
-                installpkgs
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<String>>()
-                    .join(", ")
-                    .if_supports_color(Stdout, |t| t.style(*PKGSTYLE)),
-            );
-            Err(anyhow!(
-                "Failed to install {}",
-                installpkgs
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ))
-        }
+        _ => Err(anyhow!(
+            "Failed to install {}",
+            installpkgs
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>()
+                .join(", ")
+                .if_supports_color(Stdout, |t| t.style(*PKGSTYLE)),
+        )),
     }
 }

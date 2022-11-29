@@ -1,10 +1,6 @@
-use std::process::Command;
-
 use anyhow::{anyhow, Result};
-use owo_colors::{OwoColorize, Stream::Stdout};
 use sqlx::SqlitePool;
-
-use crate::PKGSTYLE;
+use std::process::Command;
 
 pub async fn run(pkg: &str, arguments: Vec<String>) -> Result<()> {
     let dbfile = nix_data::cache::profile::nixpkgslatest().await?;

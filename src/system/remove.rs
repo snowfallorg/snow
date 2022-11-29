@@ -9,7 +9,7 @@ use anyhow::{anyhow, Context, Result};
 use owo_colors::{OwoColorize, Stream::Stdout};
 use sqlx::SqlitePool;
 
-use crate::PKGSTYLE;
+use crate::{ERRORSTYLE, PKGSTYLE};
 
 pub async fn remove(pkgs: &[&str]) -> Result<()> {
     // let f = nix_data::cache::flakes::flakespkgs().await?;
@@ -31,7 +31,7 @@ pub async fn remove(pkgs: &[&str]) -> Result<()> {
         } else {
             eprintln!(
                 "{} package {} not found",
-                "error:".if_supports_color(Stdout, |t| t.bright_red()),
+                "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
                 pkg.if_supports_color(Stdout, |t| t.style(*PKGSTYLE))
             );
         }
@@ -66,7 +66,7 @@ pub async fn remove(pkgs: &[&str]) -> Result<()> {
     }
 
     let envsyspkgs = nix_editor::read::getarrvals(&oldconfig, "environment.systemPackages")?;
-    let mut finalremove =  vec![];
+    let mut finalremove = vec![];
 
     for p in &newremove {
         if envsyspkgs.contains(&p.to_string()) {
@@ -77,7 +77,8 @@ pub async fn remove(pkgs: &[&str]) -> Result<()> {
         }
     }
 
-    let newconfig = nix_editor::write::rmarr(&oldconfig, "environment.systemPackages", finalremove)?;
+    let newconfig =
+        nix_editor::write::rmarr(&oldconfig, "environment.systemPackages", finalremove)?;
 
     let exe = match std::env::current_exe() {
         Ok(mut e) => {
@@ -138,25 +139,14 @@ pub async fn remove(pkgs: &[&str]) -> Result<()> {
             );
             Ok(())
         }
-        _ => {
-            eprintln!(
-                "{} failed to remove {}",
-                "error:".if_supports_color(Stdout, |t| t.bright_red()),
-                removepkgs
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<String>>()
-                    .join(", ")
-                    .if_supports_color(Stdout, |t| t.style(*PKGSTYLE)),
-            );
-            Err(anyhow!(
-                "Failed to remove {}",
-                removepkgs
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ))
-        }
+        _ => Err(anyhow!(
+            "Failed to remove {}",
+            removepkgs
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>()
+                .join(", ")
+                .if_supports_color(Stdout, |t| t.style(*PKGSTYLE))
+        )),
     }
 }

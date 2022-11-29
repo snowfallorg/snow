@@ -7,7 +7,9 @@ use crate::{PKGSTYLE, VERSIONSTYLE};
 
 pub async fn remove(pkg: &str) -> Result<()> {
     let pkgs = nix_data::cache::profile::getprofilepkgs().unwrap();
-    let currpkgs = nix_data::cache::profile::getprofilepkgs_versioned().await.unwrap();
+    let currpkgs = nix_data::cache::profile::getprofilepkgs_versioned()
+        .await
+        .unwrap();
     if let Some(version) = currpkgs.get(pkg) {
         println!(
             "{} {} ({})",
@@ -36,19 +38,17 @@ pub async fn remove(pkg: &str) -> Result<()> {
                 );
                 Ok(())
             }
-            _ => {
-                eprintln!(
-                    "{} failed to remove {} ({})",
-                    "error:".if_supports_color(Stdout, |t| t.bright_red()),
-                    pkg.if_supports_color(Stdout, |t| t.style(*PKGSTYLE)),
-                    version
-                        .as_str()
-                        .if_supports_color(Stdout, |t| t.style(*VERSIONSTYLE)),
-                );
-                Err(anyhow!("Failed to remove {}", pkg))
-            }
+            _ => Err(anyhow!(
+                "Failed to remove {} ({})",
+                pkg.if_supports_color(Stdout, |t| t.style(*PKGSTYLE)),
+                version
+                    .as_str()
+                    .if_supports_color(Stdout, |t| t.style(*VERSIONSTYLE))
+            )),
         }
-    } else if pkgs.get(pkg).map(|x| x.originalurl.to_string()) == Some(String::from("flake:nixpkgs")) {
+    } else if pkgs.get(pkg).map(|x| x.originalurl.to_string())
+        == Some(String::from("flake:nixpkgs"))
+    {
         println!(
             "{} {}",
             "Removing:".if_supports_color(Stdout, |t| t.bright_green()),
@@ -70,14 +70,10 @@ pub async fn remove(pkg: &str) -> Result<()> {
                 );
                 Ok(())
             }
-            _ => {
-                eprintln!(
-                    "{} failed to remove {}",
-                    "error:".if_supports_color(Stdout, |t| t.bright_red()),
-                    pkg.if_supports_color(Stdout, |t| t.style(*PKGSTYLE))
-                );
-                Err(anyhow!("Failed to remove {}", pkg))
-            }
+            _ => Err(anyhow!(
+                "Failed to remove {}",
+                pkg.if_supports_color(Stdout, |t| t.style(*PKGSTYLE))
+            )),
         }
     } else {
         let list = Command::new("nix").arg("profile").arg("list").output()?;
@@ -110,12 +106,10 @@ pub async fn remove(pkg: &str) -> Result<()> {
                             return Ok(());
                         }
                         _ => {
-                            eprintln!(
-                                "{} failed to remove {}",
-                                "error:".if_supports_color(Stdout, |t| t.bright_red()),
+                            return Err(anyhow!(
+                                "Failed to remove {}",
                                 pkg.if_supports_color(Stdout, |t| t.style(*PKGSTYLE))
-                            );
-                            return Err(anyhow!("Failed to remove {}", pkg));
+                            ));
                         }
                     }
                 }

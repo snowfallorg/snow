@@ -67,8 +67,6 @@ pub async fn update() -> Result<()> {
             );
             Ok(())
         }
-        _ => {
-            Err(anyhow!("Failed to update system"))
-        }
+        _ => Err(anyhow!("Failed to update system")),
     }
 }
