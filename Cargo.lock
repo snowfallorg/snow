@@ -991,7 +991,7 @@ dependencies = [
 [[package]]
 name = "nix-data"
 version = "0.0.2"
-source = "git+https://github.com/snowflakelinux/nix-data?branch=main#88d829d649912740ea78b29b26a3156daebff650"
+source = "git+https://github.com/snowflakelinux/nix-data?branch=main#31f6997311a16f9661820d8b5f74f41aa3d64eb7"
 dependencies = [
  "anyhow",
  "brotli",
