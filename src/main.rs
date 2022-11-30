@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::process::{exit, Command, Stdio};
 
-use clap::{ArgGroup, Parser, Subcommand, CommandFactory};
+use clap::{ArgGroup, CommandFactory, Parser, Subcommand};
 use nix_snow::{profile, system};
 use nix_snow::{ERRORSTYLE, VERSIONSTYLE};
 use owo_colors::{OwoColorize, Stream::Stdout};
@@ -99,6 +99,7 @@ async fn main() {
                         }
                     }
                 }
+                let _ = nix_data::utils::refreshicons();
             }
             Commands::Remove { packages, system } => {
                 if system {
@@ -116,6 +117,7 @@ async fn main() {
                         let _ = profile::remove::remove(&pkg).await;
                     }
                 }
+                let _ = nix_data::utils::refreshicons();
             }
             Commands::Update {
                 packages,
@@ -175,6 +177,7 @@ async fn main() {
                     );
                     exit(1)
                 }
+                let _ = nix_data::utils::refreshicons();
             }
             Commands::List { profile, system } => {
                 fn printprofilelist(lst: Result<HashMap<String, String>, anyhow::Error>) {
