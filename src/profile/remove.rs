@@ -6,7 +6,7 @@ use owo_colors::{OwoColorize, Stream::Stdout};
 use crate::{PKGSTYLE, VERSIONSTYLE};
 
 pub async fn remove(pkg: &str) -> Result<()> {
-    let pkgs = nix_data::cache::profile::getprofilepkgs().unwrap();
+    let pkgs = nix_data::cache::profile::getprofilepkgs()?;
     let currpkgs = nix_data::cache::profile::getprofilepkgs_versioned()
         .await
         .unwrap();
