@@ -61,6 +61,14 @@ Options:
   -h, --help    Print help information
 ```
 
+## Rebuild system configuration
+```
+Usage: snow rebuild
+
+Options:
+  -h, --help  Print help information
+```
+
 ## List installed packages
 ```
 Usage: snow list [OPTIONS]

@@ -32,6 +32,14 @@ enum SubCommands {
         /// Run `nixos-rebuild` with the given arguments
         arguments: Vec<String>,
     },
+    Rebuild {
+        /// How many generations to keep
+        #[arg(short, long)]
+        generations: Option<u32>,
+
+        /// Run `nixos-rebuild` with the given arguments
+        arguments: Vec<String>,
+    },
 }
 
 fn main() {
@@ -71,6 +79,16 @@ fn main() {
                 std::process::exit(1);
             }
         },
+        SubCommands::Rebuild {
+            generations,
+            arguments,
+        } => match rebuild(arguments, generations) {
+            Ok(_) => (),
+            Err(err) => {
+                eprintln!("{}", err);
+                std::process::exit(1);
+            }
+        },
     }
 }
 
@@ -96,7 +114,7 @@ fn update(path: &str, args: Vec<String>, generations: Option<u32>) -> Result<()>
     let mut cmd = Command::new("nix")
         .arg("flake")
         .arg("update")
-        .arg(&path)
+        .arg(path)
         .spawn()?;
     let x = cmd.wait()?;
     if !x.success() {

@@ -35,6 +35,7 @@ enum Commands {
         #[arg(short, long)]
         all: bool,
     },
+    Rebuild {},
     #[command(group(ArgGroup::new("listtype").args(&["profile", "system"])))]
     List {
         #[arg(short, long)]
@@ -178,6 +179,16 @@ async fn main() {
                     exit(1)
                 }
                 let _ = nix_data::utils::refreshicons();
+            }
+            Commands::Rebuild {} => {
+                if let Err(e) = system::rebuild::rebuild().await {
+                    eprintln!(
+                        "{} {}",
+                        "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                        e
+                    );
+                    exit(1)
+                }
             }
             Commands::List { profile, system } => {
                 fn printprofilelist(lst: Result<HashMap<String, String>, anyhow::Error>) {
