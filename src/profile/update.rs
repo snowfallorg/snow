@@ -3,7 +3,7 @@ use std::process::Command;
 use anyhow::{anyhow, Result};
 use owo_colors::{OwoColorize, Stream::Stdout};
 
-use crate::{PKGSTYLE, VERSIONSTYLE};
+use crate::{PKGSTYLE, VERSIONSTYLE, SYSTEM};
 
 pub async fn update(pkg: &str) -> Result<()> {
     let pkgs = nix_data::cache::profile::getprofilepkgs().unwrap();
@@ -23,8 +23,7 @@ pub async fn update(pkg: &str) -> Result<()> {
             .arg("profile")
             .arg("upgrade")
             .arg("--impure")
-            // Change to match system
-            .arg(&format!("legacyPackages.x86_64-linux.{}", pkg))
+            .arg(&format!("legacyPackages.{}.{}", &*SYSTEM, pkg))
             .status()?;
         match status {
             s if s.success() => {
@@ -58,8 +57,7 @@ pub async fn update(pkg: &str) -> Result<()> {
             .arg("profile")
             .arg("upgrade")
             .arg("--impure")
-            // Change to match system
-            .arg(&format!("legacyPackages.x86_64-linux.{}", pkg))
+            .arg(&format!("legacyPackages.{}.{}", &*SYSTEM, pkg))
             .status()?;
         match status {
             s if s.success() => {
@@ -92,8 +90,7 @@ pub async fn update(pkg: &str) -> Result<()> {
                         .arg("profile")
                         .arg("upgrade")
                         .arg("--impure")
-                        // Change to match system
-                        .arg(&parts.first().unwrap())
+                        .arg(parts.first().unwrap())
                         .status()?;
                     match status {
                         s if s.success() => {
