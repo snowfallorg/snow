@@ -18,9 +18,9 @@ pkgs.rustPlatform.buildRustPackage {
     makeWrapper
     pkg-config
   ];
-  buildInputs = with pkgs; [
+  buildInputs = (with pkgs; [
     openssl
-  ];
+  ]) ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (with pkgs; [ darwin.apple_sdk.frameworks.Security ]);
 
   doCheck = false;
 
