@@ -26,7 +26,7 @@
         defaultApp = apps.${name};
 
         devShell = pkgs.mkShell {
-          buildInputs = with pkgs; [
+          buildInputs = (with pkgs; [
             cargo
             cargo-tarpaulin
             clippy
@@ -36,7 +36,7 @@
             rustc
             rustfmt
             sqlite
-          ];
+          ]) ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (with pkgs; [ darwin.apple_sdk.frameworks.Security libiconv ]);
         };
       });
 }
