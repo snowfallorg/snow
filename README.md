@@ -9,17 +9,17 @@ Snow
 
 </div>
 
-Snow is a small command-line tool that allows you to configure all your NixOS packages in one place. Snow is written with rust and uses [nix-data](https://github.com/snowflakelinux/nix-data) and [nix-editor](https://github.com/vlinkz/nix-editor) to parse and edit configuration files. Snow is the successor of [npkg](https://github.com/vlinkz/npkg), but is focused on nix flakes based systems such as SnowflakeOS.
+Snow is a small command-line tool that allows you to configure all your NixOS packages in one place. Snow is written with rust and uses [nix-data](https://github.com/snowfallorg/nix-data) and [nix-editor](https://github.com/snowfallorg/nix-editor) to parse and edit configuration files.
 
 
 # Installation
 ```bash
-nix profile install github:snowflakelinux/snow
+nix profile install github:snowfallorg/snow
 ```
 
 # Run without installing
 ```bash
-nix run github:snowflakelinux/snow
+nix run github:snowfallorg/snow
 ```
 
 # Usage
