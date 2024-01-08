@@ -11,8 +11,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1.0"
 clap = { version = "4.1", features = ["derive"] }
-#nix-data = { git = "https://github.com/snowflakelinux/nix-data", branch = "main" }
-nix-data = { path = "/home/victor/Documents/rust/nix-data" }
+nix-data = { git = "https://github.com/snowfallorg/nix-data", branch = "main" }
 owo-colors = { version = "3.5", features = ["supports-colors"] }
 lazy_static = "1.4"
 ijson = "0.1"

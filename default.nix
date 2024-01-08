@@ -10,7 +10,7 @@ pkgs.rustPlatform.buildRustPackage {
   cargoLock = {
     lockFile = ./Cargo.lock;
     outputHashes = {
-      "nix-data-0.0.2" = "sha256-yts2bkp9cn4SuYPYjgTNbOwTtpFxps3TU8zmS/ftN/Q=";
+      "nix-data-0.0.3" = "sha256-kLcAtvZPa1VKHmMJR3xiX94lkkmfUFvzn/pnw6r5w4I=";
     };
   };
 
