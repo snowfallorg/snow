@@ -1,10 +1,10 @@
-use std::collections::HashMap;
-use std::process::{exit, Command, Stdio};
-
 use clap::{ArgGroup, CommandFactory, Parser, Subcommand};
-use nix_snow::{profile, system};
-use nix_snow::{ERRORSTYLE, VERSIONSTYLE};
+use nix_snow::{ERRORSTYLE, VERSIONSTYLE, WARNINGSTYLE};
 use owo_colors::{OwoColorize, Stream::Stdout};
+use std::{
+    path::Path,
+    process::{exit, Command, Stdio},
+};
 
 #[derive(Parser)]
 struct Cli {
@@ -17,32 +17,47 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
+    #[command(group(ArgGroup::new("install").args(&["system", "home"])))]
     Install {
         packages: Vec<String>,
         #[arg(short, long)]
         system: bool,
+        #[arg(short, long)]
+        home: bool,
     },
+    #[command(group(ArgGroup::new("remove").args(&["system", "home"])))]
     Remove {
         packages: Vec<String>,
         #[arg(short, long)]
         system: bool,
+        #[arg(short, long)]
+        home: bool,
     },
-    #[command(group(ArgGroup::new("install").args(&["system", "all"])))]
+    #[command(group(ArgGroup::new("update").args(&["system", "home", "all"])))]
     Update {
         packages: Option<Vec<String>>,
         #[arg(short, long)]
         system: bool,
         #[arg(short, long)]
+        home: bool,
+        #[arg(short, long)]
         all: bool,
     },
-    Rebuild {},
-    #[command(group(ArgGroup::new("listtype").args(&["profile", "system"])))]
+    #[command(group(ArgGroup::new("rebuild").args(&["system", "home"])))]
+    Rebuild {
+        #[arg(short, long)]
+        system: bool,
+        #[arg(short, long)]
+        home: bool,
+    },
+    #[command(group(ArgGroup::new("listtype").args(&["profile", "system", "home"])))]
     List {
         #[arg(short, long)]
         profile: bool,
-
         #[arg(short, long)]
         system: bool,
+        #[arg(short, long)]
+        home: bool,
     },
     Search {
         query: Vec<String>,
@@ -77,10 +92,34 @@ async fn main() {
 
     if let Some(command) = cli.command {
         match command {
-            Commands::Install { packages, system } => {
+            Commands::Install {
+                packages,
+                system,
+                home,
+            } => {
                 if system {
                     let p: Vec<&str> = packages.iter().map(|x| &**x).collect();
-                    if let Err(e) = system::install::install(&p).await {
+                    let db = libsnow::metadata::database::database_connection()
+                        .await
+                        .unwrap();
+                    if let Err(e) =
+                        libsnow::nixos::install::install(&p, &db, libsnow::nixos::AuthMethod::Sudo)
+                            .await
+                    {
+                        eprintln!(
+                            "{} {}",
+                            "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                            e
+                        );
+                        exit(1)
+                    }
+                } else if home {
+                    check_home_manager();
+                    let p: Vec<&str> = packages.iter().map(|x| &**x).collect();
+                    let db = libsnow::metadata::database::database_connection()
+                        .await
+                        .unwrap();
+                    if let Err(e) = libsnow::homemanager::install::install(&p, &db).await {
                         eprintln!(
                             "{} {}",
                             "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
@@ -89,23 +128,52 @@ async fn main() {
                         exit(1)
                     }
                 } else {
-                    for pkg in packages {
-                        if let Err(e) = profile::install::install(&pkg).await {
-                            eprintln!(
-                                "{} {}",
-                                "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
-                                e
-                            );
-                            exit(1)
-                        }
+                    let p: Vec<&str> = packages.iter().map(|x| &**x).collect();
+                    if let Err(e) = libsnow::profile::install::install(&p).await {
+                        eprintln!(
+                            "{} {}",
+                            "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                            e
+                        );
+                        exit(1)
                     }
                 }
-                let _ = nix_data::utils::refreshicons();
+                if let Err(e) = libsnow::utils::misc::refresh_icons() {
+                    eprintln!(
+                        "{} failed to refresh icons: {}",
+                        "warning:".if_supports_color(Stdout, |t| t.style(*WARNINGSTYLE)),
+                        e
+                    );
+                }
             }
-            Commands::Remove { packages, system } => {
+            Commands::Remove {
+                packages,
+                system,
+                home,
+            } => {
                 if system {
                     let p: Vec<&str> = packages.iter().map(|x| &**x).collect();
-                    if let Err(e) = system::remove::remove(&p).await {
+                    let db = libsnow::metadata::database::database_connection()
+                        .await
+                        .unwrap();
+                    if let Err(e) =
+                        libsnow::nixos::remove::remove(&p, &db, libsnow::nixos::AuthMethod::Sudo)
+                            .await
+                    {
+                        eprintln!(
+                            "{} {}",
+                            "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                            e
+                        );
+                        exit(1)
+                    }
+                } else if home {
+                    check_home_manager();
+                    let p: Vec<&str> = packages.iter().map(|x| &**x).collect();
+                    let db = libsnow::metadata::database::database_connection()
+                        .await
+                        .unwrap();
+                    if let Err(e) = libsnow::homemanager::remove::remove(&p, &db).await {
                         eprintln!(
                             "{} {}",
                             "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
@@ -114,15 +182,28 @@ async fn main() {
                         exit(1)
                     }
                 } else {
-                    for pkg in packages {
-                        let _ = profile::remove::remove(&pkg).await;
+                    let p: Vec<&str> = packages.iter().map(|x| &**x).collect();
+                    if let Err(e) = libsnow::profile::remove::remove(&p).await {
+                        eprintln!(
+                            "{} {}",
+                            "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                            e
+                        );
+                        exit(1)
                     }
                 }
-                let _ = nix_data::utils::refreshicons();
+                if let Err(e) = libsnow::utils::misc::refresh_icons() {
+                    eprintln!(
+                        "{} failed to refresh icons: {}",
+                        "warning:".if_supports_color(Stdout, |t| t.style(*WARNINGSTYLE)),
+                        e
+                    );
+                }
             }
             Commands::Update {
                 packages,
                 system,
+                home,
                 all,
             } => {
                 if all {
@@ -133,21 +214,27 @@ async fn main() {
                             "warning:".if_supports_color(Stdout, |t| t.bright_yellow())
                         );
                     }
-                    if let Err(e) = system::update::update().await {
-                        eprintln!(
-                            "{} {}",
-                            "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
-                            e
-                        );
-                        exit(1)
+                    if is_system_configured() {
+                        if let Err(e) =
+                            libsnow::nixos::update::update(libsnow::nixos::AuthMethod::Sudo).await
+                        {
+                            eprintln!(
+                                "{} {}",
+                                "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                                e
+                            );
+                            exit(1)
+                        }
                     }
-                    if let Err(e) = profile::update::updateall() {
-                        eprintln!(
-                            "{} {}",
-                            "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
-                            e
-                        );
-                        exit(1)
+                    if is_profile_configured() {
+                        if let Err(e) = libsnow::profile::update::update_all().await {
+                            eprintln!(
+                                "{} {}",
+                                "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                                e
+                            );
+                            exit(1)
+                        }
                     }
                 } else if system {
                     // System upgrade updates all packages
@@ -157,7 +244,26 @@ async fn main() {
                             "warning:".if_supports_color(Stdout, |t| t.bright_yellow())
                         );
                     }
-                    if let Err(e) = system::update::update().await {
+                    if let Err(e) =
+                        libsnow::nixos::update::update(libsnow::nixos::AuthMethod::Sudo).await
+                    {
+                        eprintln!(
+                            "{} {}",
+                            "error:"
+                                .if_supports_color(Stdout, |t| t.bright_red().bold().to_string()),
+                            e
+                        );
+                        exit(1)
+                    }
+                } else if home {
+                    check_home_manager();
+                    if packages.is_some() {
+                        println!(
+                            "{} ignoring packages passed to home-manager upgrade",
+                            "warning:".if_supports_color(Stdout, |t| t.bright_yellow())
+                        );
+                    }
+                    if let Err(e) = libsnow::homemanager::update::update().await {
                         eprintln!(
                             "{} {}",
                             "error:"
@@ -167,10 +273,11 @@ async fn main() {
                         exit(1)
                     }
                 } else if let Some(pkgs) = packages {
-                    for pkg in pkgs {
-                        let _ = profile::update::update(&pkg).await;
-                    }
-                } else if let Err(e) = profile::update::updateall() {
+                    let _ = libsnow::profile::update::update(
+                        &pkgs.iter().map(|x| x.as_str()).collect::<Vec<_>>(),
+                    )
+                    .await;
+                } else if let Err(e) = libsnow::profile::update::update_all().await {
                     eprintln!(
                         "{} {}",
                         "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
@@ -178,73 +285,201 @@ async fn main() {
                     );
                     exit(1)
                 }
-                let _ = nix_data::utils::refreshicons();
-            }
-            Commands::Rebuild {} => {
-                if let Err(e) = system::rebuild::rebuild().await {
+                if let Err(e) = libsnow::utils::misc::refresh_icons() {
                     eprintln!(
-                        "{} {}",
-                        "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                        "{} failed to refresh icons: {}",
+                        "warning:".if_supports_color(Stdout, |t| t.style(*WARNINGSTYLE)),
                         e
                     );
-                    exit(1)
                 }
             }
-            Commands::List { profile, system } => {
-                fn printprofilelist(lst: Result<HashMap<String, String>, anyhow::Error>) {
-                    if let Ok(pkgs) = lst {
-                        let mut list = pkgs.into_iter().collect::<Vec<_>>();
-                        list.sort();
-                        for (pkg, version) in list {
-                            println!(
-                                "{} ({})",
-                                pkg,
-                                version.if_supports_color(Stdout, |t| t.style(*VERSIONSTYLE))
-                            );
-                        }
-                    } else {
-                        exit(1);
+            Commands::Rebuild { system, home } => {
+                if system || !home {
+                    if let Err(e) =
+                        libsnow::nixos::rebuild::rebuild(libsnow::nixos::AuthMethod::Sudo).await
+                    {
+                        eprintln!(
+                            "{} {}",
+                            "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                            e
+                        );
+                        exit(1)
+                    }
+                } else if home {
+                    check_home_manager();
+                    if let Err(e) = libsnow::homemanager::rebuild::rebuild().await {
+                        eprintln!(
+                            "{} {}",
+                            "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                            e
+                        );
+                        exit(1)
                     }
                 }
-                fn printsystemlist(lst: Result<HashMap<String, Option<String>>, anyhow::Error>) {
-                    if let Ok(pkgs) = lst {
-                        let mut list = pkgs.into_iter().collect::<Vec<_>>();
-                        list.sort();
-                        for (pkg, version) in list {
-                            if let Some(v) = version {
-                                println!(
-                                    "{} ({})",
-                                    pkg,
-                                    v.if_supports_color(Stdout, |t| t.style(*VERSIONSTYLE))
-                                );
-                            } else {
-                                println!("{}", pkg);
-                            }
-                        }
-                    } else {
-                        exit(1);
-                    }
-                }
-                if profile {
-                    let lst = profile::list::list().await;
-                    printprofilelist(lst);
-                } else if system {
-                    let lst = nix_snow::system::list::list().await;
-                    printsystemlist(lst);
-                } else {
-                    let lst = profile::list::list().await;
-                    let syslst = nix_snow::system::list::list().await;
+            }
+            Commands::List {
+                profile,
+                system,
+                home,
+            } => {
+                fn printprofilelist(mut lst: Vec<libsnow::Package>) {
+                    lst.sort_by(|a, b| a.attr.to_string().cmp(&b.attr.to_string()));
                     println!(
                         "{}",
                         "Profile Packages:".if_supports_color(Stdout, |t| t.bright_cyan())
                     );
-                    printprofilelist(lst);
-                    println!();
+                    for pkg in lst {
+                        println!(
+                            "{} ({})",
+                            pkg.attr.to_string(),
+                            pkg.version
+                                .unwrap_or_default()
+                                .if_supports_color(Stdout, |t| t.style(*VERSIONSTYLE))
+                        );
+                    }
+                }
+                fn printsystemlist(mut lst: Vec<libsnow::Package>) {
+                    lst.sort_by(|a, b| a.attr.to_string().cmp(&b.attr.to_string()));
                     println!(
                         "{}",
                         "System Packages:".if_supports_color(Stdout, |t| t.bright_cyan())
                     );
-                    printsystemlist(syslst);
+                    for pkg in lst {
+                        if let Some(v) = pkg.version {
+                            println!(
+                                "{} ({})",
+                                pkg.attr.to_string(),
+                                v.if_supports_color(Stdout, |t| t.style(*VERSIONSTYLE))
+                            );
+                        } else {
+                            println!("{}", pkg.attr.to_string());
+                        }
+                    }
+                }
+                fn printhomelist(mut lst: Vec<libsnow::Package>) {
+                    lst.sort_by(|a, b| a.attr.to_string().cmp(&b.attr.to_string()));
+                    println!(
+                        "{}",
+                        "Home Manager Packages:".if_supports_color(Stdout, |t| t.bright_cyan())
+                    );
+                    for pkg in lst {
+                        println!(
+                            "{} ({})",
+                            pkg.attr.to_string(),
+                            pkg.version
+                                .unwrap_or_default()
+                                .if_supports_color(Stdout, |t| t.style(*VERSIONSTYLE))
+                        );
+                    }
+                }
+                if profile {
+                    let lst = libsnow::profile::list::list();
+                    match lst {
+                        Ok(lst) => printprofilelist(lst),
+                        Err(e) => {
+                            eprintln!(
+                                "{} {}",
+                                "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                                e
+                            );
+                            exit(1);
+                        }
+                    }
+                } else if system {
+                    let db = libsnow::metadata::database::database_connection()
+                        .await
+                        .unwrap();
+                    let lst = libsnow::nixos::list::list_systempackages(&db);
+                    match lst {
+                        Ok(lst) => printsystemlist(lst),
+                        Err(e) => {
+                            eprintln!(
+                                "{} {}",
+                                "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                                e
+                            );
+                            exit(1);
+                        }
+                    }
+                } else if home {
+                    check_home_manager();
+                    let db = libsnow::metadata::database::database_connection()
+                        .await
+                        .unwrap();
+                    let lst = libsnow::homemanager::list::list(&db);
+                    match lst {
+                        Ok(lst) => printhomelist(lst),
+                        Err(e) => {
+                            eprintln!(
+                                "{} {}",
+                                "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                                e
+                            );
+                            exit(1);
+                        }
+                    }
+                } else {
+                    let db = libsnow::metadata::database::database_connection()
+                        .await
+                        .unwrap();
+                    let mut printed_first = false;
+                    if is_profile_configured() {
+                        let lst = libsnow::profile::list::list();
+                        match lst {
+                            Ok(lst) => {
+                                printprofilelist(lst);
+                                printed_first = true;
+                            }
+                            Err(e) => {
+                                eprintln!(
+                                    "{} {}",
+                                    "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                                    e
+                                );
+                                exit(1);
+                            }
+                        }
+                    }
+                    if is_system_configured() {
+                        let syslst = libsnow::nixos::list::list_systempackages(&db);
+                        match syslst {
+                            Ok(lst) => {
+                                if printed_first {
+                                    println!();
+                                } else {
+                                    printed_first = true;
+                                }
+                                printsystemlist(lst);
+                            }
+                            Err(e) => {
+                                eprintln!(
+                                    "{} {}",
+                                    "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                                    e
+                                );
+                                exit(1);
+                            }
+                        }
+                    }
+                    if home_manager_installed() && is_home_configured() {
+                        let homelst = libsnow::homemanager::list::list(&db);
+                        match homelst {
+                            Ok(homelst) => {
+                                if printed_first {
+                                    println!();
+                                }
+                                printhomelist(homelst);
+                            }
+                            Err(e) => {
+                                eprintln!(
+                                    "{} {}",
+                                    "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                                    e
+                                );
+                                exit(1);
+                            }
+                        }
+                    }
                 }
             }
             Commands::Search { query } => {
@@ -266,7 +501,12 @@ async fn main() {
                 };
             }
             Commands::Run { package, arguments } => {
-                if let Err(e) = profile::run::run(&package, arguments).await {
+                if let Err(e) = libsnow::profile::run::run(
+                    &package,
+                    &arguments.iter().map(|x| x.as_str()).collect::<Vec<_>>(),
+                )
+                .await
+                {
                     eprintln!(
                         "{} {}",
                         "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
@@ -278,5 +518,48 @@ async fn main() {
         }
     } else {
         let _ = Cli::command().print_help();
+    }
+}
+
+fn check_home_manager() {
+    if !home_manager_installed() {
+        eprintln!(
+            "{} {}",
+            "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+            "Home Manager is not installed. Please install it first."
+        );
+        exit(1);
+    }
+}
+
+fn home_manager_installed() -> bool {
+    Path::new(&format!(
+        "{}/.local/state/nix/profiles/home-manager",
+        std::env::var("HOME").unwrap().as_str()
+    ))
+    .is_symlink()
+}
+
+fn is_system_configured() -> bool {
+    if let Ok(config) = libsnow::config::configfile::get_config() {
+        config.systemconfig.is_some()
+    } else {
+        false
+    }
+}
+
+fn is_home_configured() -> bool {
+    if let Ok(config) = libsnow::config::configfile::get_config() {
+        config.homeconfig.is_some()
+    } else {
+        false
+    }
+}
+
+fn is_profile_configured() -> bool {
+    if let Ok(home) = std::env::var("HOME") {
+        Path::new(&format!("{}/.nix-profile/manifest.json", home)).exists()
+    } else {
+        false
     }
 }

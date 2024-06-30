@@ -1,6 +1,6 @@
 [package]
 name = "nix-snow"
-version = "0.0.2"
+version = "0.1.0"
 edition = "2021"
 default-run = "snow"
 
@@ -10,16 +10,9 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0"
-clap = { version = "4.1", features = ["derive"] }
-nix-data = { git = "https://github.com/snowfallorg/nix-data", branch = "main" }
-owo-colors = { version = "3.5", features = ["supports-colors"] }
+clap = { version = "4.5", features = ["derive"] }
+owo-colors = { version = "4.0", features = ["supports-colors"] }
 lazy_static = "1.4"
-ijson = "0.1"
-nix-editor = "0.3.0"
 pretty_env_logger = "0.5"
-sqlx = { version = "0.7", features = [ "runtime-tokio-native-tls" , "sqlite" ] }
 tokio = { version = "1", features = ["full"] }
-
-[workspace]
-members = [".", "snow-helper"]
-default-members = [".", "snow-helper"]
+libsnow = { git = "https://github.com/snowfallorg/libsnow" }

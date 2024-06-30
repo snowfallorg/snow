@@ -33,7 +33,8 @@ Arguments:
 
 Options:
   -s, --system  
-  -h, --help    Print help information
+  -h, --home    
+  -h, --help    Print help
 ```
 
 ## Remove a package
@@ -45,7 +46,8 @@ Arguments:
 
 Options:
   -s, --system  
-  -h, --help    Print help information
+  -h, --home    
+  -h, --help    Print help
 ```
 
 ## Update package/s
@@ -57,8 +59,9 @@ Arguments:
 
 Options:
   -s, --system  
+  -h, --home    
   -a, --all     
-  -h, --help    Print help information
+  -h, --help    Print help
 ```
 
 ## Rebuild system configuration
