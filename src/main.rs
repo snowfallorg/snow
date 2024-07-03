@@ -1,5 +1,5 @@
 use clap::{ArgGroup, CommandFactory, Parser, Subcommand};
-use nix_snow::{ERRORSTYLE, VERSIONSTYLE, WARNINGSTYLE};
+use nix_snow::{is_home_configured, is_profile_configured, is_system_configured, ERRORSTYLE, VERSIONSTYLE, WARNINGSTYLE};
 use owo_colors::{OwoColorize, Stream::Stdout};
 use std::{
     path::Path,
@@ -538,28 +538,4 @@ fn home_manager_installed() -> bool {
         std::env::var("HOME").unwrap().as_str()
     ))
     .is_symlink()
-}
-
-fn is_system_configured() -> bool {
-    if let Ok(config) = libsnow::config::configfile::get_config() {
-        config.systemconfig.is_some()
-    } else {
-        false
-    }
-}
-
-fn is_home_configured() -> bool {
-    if let Ok(config) = libsnow::config::configfile::get_config() {
-        config.homeconfig.is_some()
-    } else {
-        false
-    }
-}
-
-fn is_profile_configured() -> bool {
-    if let Ok(home) = std::env::var("HOME") {
-        Path::new(&format!("{}/.nix-profile/manifest.json", home)).exists()
-    } else {
-        false
-    }
 }

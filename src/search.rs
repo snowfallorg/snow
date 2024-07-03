@@ -1,4 +1,4 @@
-use crate::VERSIONSTYLE;
+use crate::{is_home_configured, is_profile_configured, is_system_configured, VERSIONSTYLE};
 use anyhow::Result;
 use libsnow::metadata::search::{get_searcher, SearchQuery, SearchResult};
 use owo_colors::{OwoColorize, Stream::Stdout};
@@ -6,14 +6,30 @@ use owo_colors::{OwoColorize, Stream::Stdout};
 pub async fn search(query: &[&str]) -> Result<()> {
     let db = libsnow::metadata::database::database_connection().await?;
 
-    let currprofilepkgs = libsnow::profile::list::list()?
-        .into_iter()
-        .map(|x| x.attr.to_string())
-        .collect::<Vec<_>>();
-    let currsyspkgs = libsnow::nixos::list::list_systempackages(&db)?
-        .into_iter()
-        .map(|x| x.attr.to_string())
-        .collect::<Vec<_>>();
+    let currprofilepkgs = if is_profile_configured() {
+        libsnow::profile::list::list()?
+            .into_iter()
+            .map(|x| x.attr.to_string())
+            .collect::<Vec<_>>()
+    } else {
+        vec![]
+    };
+    let currsyspkgs = if is_system_configured() {
+        libsnow::nixos::list::list_systempackages(&db)?
+            .into_iter()
+            .map(|x| x.attr.to_string())
+            .collect::<Vec<_>>()
+    } else {
+        vec![]
+    };
+    let currhomepkgs = if is_home_configured() {
+        libsnow::homemanager::list::list(&db)?
+            .into_iter()
+            .map(|x| x.attr.to_string())
+            .collect::<Vec<_>>()
+    } else {
+        vec![]
+    };
 
     let dbsearcher = get_searcher(&db)?;
     let mut search_result = libsnow::metadata::search::search(
@@ -67,6 +83,9 @@ pub async fn search(query: &[&str]) -> Result<()> {
         }
         if currsyspkgs.contains(&attribute) {
             pkg = format!("{} ({})", pkg, "system".bright_magenta());
+        }
+        if currhomepkgs.contains(&attribute) {
+            pkg = format!("{} ({})", pkg, "home".bright_yellow());
         }
         if let Some(version) = version {
             pkg = format!(
