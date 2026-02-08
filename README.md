@@ -9,7 +9,7 @@ Snow
 
 </div>
 
-Snow is a small command-line tool that allows you to configure all your NixOS packages in one place. Snow is written with rust and uses [nix-data](https://github.com/snowfallorg/nix-data) and [nix-editor](https://github.com/snowfallorg/nix-editor) to parse and edit configuration files.
+Snow is a small command-line tool that allows you to configure all your NixOS packages in one place. Snow is written with rust and uses [libsnow](https://github.com/snowfallorg/libsnow) and [nix-editor](https://github.com/snowfallorg/nix-editor) to parse and edit configuration files.
 
 
 # Installation

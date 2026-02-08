@@ -1,9 +1,12 @@
 use clap::{ArgGroup, CommandFactory, Parser, Subcommand};
-use nix_snow::{is_home_configured, is_profile_configured, is_system_configured, ERRORSTYLE, VERSIONSTYLE, WARNINGSTYLE};
+use nix_snow::{
+    ERRORSTYLE, VERSIONSTYLE, WARNINGSTYLE, is_home_configured, is_profile_configured,
+    is_system_configured,
+};
 use owo_colors::{OwoColorize, Stream::Stdout};
 use std::{
     path::Path,
-    process::{exit, Command, Stdio},
+    process::{Command, Stdio, exit},
 };
 
 #[derive(Parser)]
@@ -99,11 +102,9 @@ async fn main() {
             } => {
                 if system {
                     let p: Vec<&str> = packages.iter().map(|x| &**x).collect();
-                    let db = libsnow::metadata::database::database_connection()
-                        .await
-                        .unwrap();
+                    let md = libsnow::metadata::Metadata::connect().await.unwrap();
                     if let Err(e) =
-                        libsnow::nixos::install::install(&p, &db, libsnow::nixos::AuthMethod::Sudo)
+                        libsnow::nixos::install::install(&p, &md, libsnow::nixos::AuthMethod::Sudo)
                             .await
                     {
                         eprintln!(
@@ -116,10 +117,8 @@ async fn main() {
                 } else if home {
                     check_home_manager();
                     let p: Vec<&str> = packages.iter().map(|x| &**x).collect();
-                    let db = libsnow::metadata::database::database_connection()
-                        .await
-                        .unwrap();
-                    if let Err(e) = libsnow::homemanager::install::install(&p, &db).await {
+                    let md = libsnow::metadata::Metadata::connect().await.unwrap();
+                    if let Err(e) = libsnow::homemanager::install::install(&p, &md).await {
                         eprintln!(
                             "{} {}",
                             "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
@@ -153,11 +152,9 @@ async fn main() {
             } => {
                 if system {
                     let p: Vec<&str> = packages.iter().map(|x| &**x).collect();
-                    let db = libsnow::metadata::database::database_connection()
-                        .await
-                        .unwrap();
+                    let md = libsnow::metadata::Metadata::connect().await.unwrap();
                     if let Err(e) =
-                        libsnow::nixos::remove::remove(&p, &db, libsnow::nixos::AuthMethod::Sudo)
+                        libsnow::nixos::remove::remove(&p, &md, libsnow::nixos::AuthMethod::Sudo)
                             .await
                     {
                         eprintln!(
@@ -170,10 +167,8 @@ async fn main() {
                 } else if home {
                     check_home_manager();
                     let p: Vec<&str> = packages.iter().map(|x| &**x).collect();
-                    let db = libsnow::metadata::database::database_connection()
-                        .await
-                        .unwrap();
-                    if let Err(e) = libsnow::homemanager::remove::remove(&p, &db).await {
+                    let md = libsnow::metadata::Metadata::connect().await.unwrap();
+                    if let Err(e) = libsnow::homemanager::remove::remove(&p, &md).await {
                         eprintln!(
                             "{} {}",
                             "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
@@ -214,27 +209,26 @@ async fn main() {
                             "warning:".if_supports_color(Stdout, |t| t.bright_yellow())
                         );
                     }
-                    if is_system_configured() {
-                        if let Err(e) =
+                    if is_system_configured()
+                        && let Err(e) =
                             libsnow::nixos::update::update(libsnow::nixos::AuthMethod::Sudo).await
-                        {
-                            eprintln!(
-                                "{} {}",
-                                "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
-                                e
-                            );
-                            exit(1)
-                        }
+                    {
+                        eprintln!(
+                            "{} {}",
+                            "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                            e
+                        );
+                        exit(1)
                     }
-                    if is_profile_configured() {
-                        if let Err(e) = libsnow::profile::update::update_all().await {
-                            eprintln!(
-                                "{} {}",
-                                "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
-                                e
-                            );
-                            exit(1)
-                        }
+                    if is_profile_configured()
+                        && let Err(e) = libsnow::profile::update::update_all().await
+                    {
+                        eprintln!(
+                            "{} {}",
+                            "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
+                            e
+                        );
+                        exit(1)
                     }
                 } else if system {
                     // System upgrade updates all packages
@@ -331,7 +325,7 @@ async fn main() {
                     for pkg in lst {
                         println!(
                             "{} ({})",
-                            pkg.attr.to_string(),
+                            pkg.attr,
                             pkg.version
                                 .unwrap_or_default()
                                 .if_supports_color(Stdout, |t| t.style(*VERSIONSTYLE))
@@ -348,11 +342,11 @@ async fn main() {
                         if let Some(v) = pkg.version {
                             println!(
                                 "{} ({})",
-                                pkg.attr.to_string(),
+                                pkg.attr,
                                 v.if_supports_color(Stdout, |t| t.style(*VERSIONSTYLE))
                             );
                         } else {
-                            println!("{}", pkg.attr.to_string());
+                            println!("{}", pkg.attr);
                         }
                     }
                 }
@@ -365,7 +359,7 @@ async fn main() {
                     for pkg in lst {
                         println!(
                             "{} ({})",
-                            pkg.attr.to_string(),
+                            pkg.attr,
                             pkg.version
                                 .unwrap_or_default()
                                 .if_supports_color(Stdout, |t| t.style(*VERSIONSTYLE))
@@ -386,10 +380,8 @@ async fn main() {
                         }
                     }
                 } else if system {
-                    let db = libsnow::metadata::database::database_connection()
-                        .await
-                        .unwrap();
-                    let lst = libsnow::nixos::list::list_systempackages(&db);
+                    let md = libsnow::metadata::Metadata::connect().await.unwrap();
+                    let lst = libsnow::nixos::list::list_systempackages(&md);
                     match lst {
                         Ok(lst) => printsystemlist(lst),
                         Err(e) => {
@@ -403,10 +395,8 @@ async fn main() {
                     }
                 } else if home {
                     check_home_manager();
-                    let db = libsnow::metadata::database::database_connection()
-                        .await
-                        .unwrap();
-                    let lst = libsnow::homemanager::list::list(&db);
+                    let md = libsnow::metadata::Metadata::connect().await.unwrap();
+                    let lst = libsnow::homemanager::list::list(&md);
                     match lst {
                         Ok(lst) => printhomelist(lst),
                         Err(e) => {
@@ -419,9 +409,7 @@ async fn main() {
                         }
                     }
                 } else {
-                    let db = libsnow::metadata::database::database_connection()
-                        .await
-                        .unwrap();
+                    let md = libsnow::metadata::Metadata::connect().await.unwrap();
                     let mut printed_first = false;
                     if is_profile_configured() {
                         let lst = libsnow::profile::list::list();
@@ -441,7 +429,7 @@ async fn main() {
                         }
                     }
                     if is_system_configured() {
-                        let syslst = libsnow::nixos::list::list_systempackages(&db);
+                        let syslst = libsnow::nixos::list::list_systempackages(&md);
                         match syslst {
                             Ok(lst) => {
                                 if printed_first {
@@ -462,7 +450,7 @@ async fn main() {
                         }
                     }
                     if home_manager_installed() && is_home_configured() {
-                        let homelst = libsnow::homemanager::list::list(&db);
+                        let homelst = libsnow::homemanager::list::list(&md);
                         match homelst {
                             Ok(homelst) => {
                                 if printed_first {
@@ -524,9 +512,8 @@ async fn main() {
 fn check_home_manager() {
     if !home_manager_installed() {
         eprintln!(
-            "{} {}",
-            "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
-            "Home Manager is not installed. Please install it first."
+            "{} Home Manager is not installed. Please install it first.",
+            "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE))
         );
         exit(1);
     }

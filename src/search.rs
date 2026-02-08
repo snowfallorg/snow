@@ -1,13 +1,14 @@
-use crate::{is_home_configured, is_profile_configured, is_system_configured, VERSIONSTYLE};
+use crate::{VERSIONSTYLE, is_home_configured, is_profile_configured, is_system_configured};
 use anyhow::Result;
-use libsnow::metadata::search::{get_searcher, SearchQuery, SearchResult};
+use libsnow::metadata::SearchResult;
 use owo_colors::{OwoColorize, Stream::Stdout};
 
 pub async fn search(query: &[&str]) -> Result<()> {
-    let db = libsnow::metadata::database::database_connection().await?;
+    let md = libsnow::metadata::Metadata::connect().await?;
 
     let currprofilepkgs = if is_profile_configured() {
-        libsnow::profile::list::list()?
+        libsnow::profile::list::list()
+            .unwrap_or_default()
             .into_iter()
             .map(|x| x.attr.to_string())
             .collect::<Vec<_>>()
@@ -15,7 +16,8 @@ pub async fn search(query: &[&str]) -> Result<()> {
         vec![]
     };
     let currsyspkgs = if is_system_configured() {
-        libsnow::nixos::list::list_systempackages(&db)?
+        libsnow::nixos::list::list_systempackages(&md)
+            .unwrap_or_default()
             .into_iter()
             .map(|x| x.attr.to_string())
             .collect::<Vec<_>>()
@@ -23,7 +25,8 @@ pub async fn search(query: &[&str]) -> Result<()> {
         vec![]
     };
     let currhomepkgs = if is_home_configured() {
-        libsnow::homemanager::list::list(&db)?
+        libsnow::homemanager::list::list(&md)
+            .unwrap_or_default()
             .into_iter()
             .map(|x| x.attr.to_string())
             .collect::<Vec<_>>()
@@ -31,15 +34,7 @@ pub async fn search(query: &[&str]) -> Result<()> {
         vec![]
     };
 
-    let dbsearcher = get_searcher(&db)?;
-    let mut search_result = libsnow::metadata::search::search(
-        &SearchQuery {
-            query: &query.join(" "),
-            limit: 100,
-            score_threshold: 0.0,
-        },
-        &dbsearcher,
-    )?;
+    let mut search_result = md.search(&query.join(" "), 100, 0.0)?;
     search_result.reverse();
 
     for SearchResult {
