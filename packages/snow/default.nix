@@ -18,7 +18,7 @@ rustPlatform.buildRustPackage {
   cargoLock = {
     lockFile = ../../Cargo.lock;
     outputHashes = {
-      "libsnow-0.0.2-alpha.1" = "sha256-p4nio0EJSBqEuvCGz8sP05q8k7PSC+jQjXVEyJDZ4OE=";
+      "libsnow-0.0.2-alpha.1" = "sha256-PjEehXjy1SdqN28Z3QUDr8YHqd/J024NIwuNDhYHwAY=";
     };
   };
 
