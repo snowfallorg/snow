@@ -518,13 +518,6 @@ async fn main() {
 }
 
 fn check_home_manager() {
-    let config = libsnow::config::configfile::get_config();
-    if let Ok(config) = config
-        && config.home_config_file.is_some()
-    {
-        return;
-    }
-
     if !home_manager_installed() {
         eprintln!(
             "{} Home Manager is not installed. Please install it first.",
@@ -535,6 +528,13 @@ fn check_home_manager() {
 }
 
 fn home_manager_installed() -> bool {
+    let config = libsnow::config::configfile::get_config();
+    if let Ok(config) = config
+        && config.home_config_file.is_some()
+    {
+        return true;
+    }
+
     Path::new(&format!(
         "{}/.local/state/nix/profiles/home-manager",
         std::env::var("HOME").unwrap().as_str()
