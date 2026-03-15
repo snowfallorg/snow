@@ -1288,7 +1288,7 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 [[package]]
 name = "libsnow"
 version = "0.0.2-alpha.1"
-source = "git+https://github.com/snowfallorg/libsnow#3dc44465975f9e1d684051687459e3a7670098fb"
+source = "git+https://github.com/snowfallorg/libsnow#a65d52c38e1dab09e314a075f547b9bfcee54f03"
 dependencies = [
  "anyhow",
  "brotli",

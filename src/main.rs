@@ -1,4 +1,5 @@
 use clap::{ArgGroup, CommandFactory, Parser, Subcommand};
+use libsnow::nixos::AuthMethod;
 use nix_snow::{
     ERRORSTYLE, VERSIONSTYLE, WARNINGSTYLE, is_home_configured, is_profile_configured,
     is_system_configured,
@@ -118,7 +119,9 @@ async fn main() {
                     check_home_manager();
                     let p: Vec<&str> = packages.iter().map(|x| &**x).collect();
                     let md = libsnow::metadata::Metadata::connect().await.unwrap();
-                    if let Err(e) = libsnow::homemanager::install::install(&p, &md).await {
+                    if let Err(e) =
+                        libsnow::homemanager::install::install(&p, &md, AuthMethod::Sudo).await
+                    {
                         eprintln!(
                             "{} {}",
                             "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
@@ -168,7 +171,9 @@ async fn main() {
                     check_home_manager();
                     let p: Vec<&str> = packages.iter().map(|x| &**x).collect();
                     let md = libsnow::metadata::Metadata::connect().await.unwrap();
-                    if let Err(e) = libsnow::homemanager::remove::remove(&p, &md).await {
+                    if let Err(e) =
+                        libsnow::homemanager::remove::remove(&p, &md, AuthMethod::Sudo).await
+                    {
                         eprintln!(
                             "{} {}",
                             "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
@@ -257,7 +262,7 @@ async fn main() {
                             "warning:".if_supports_color(Stdout, |t| t.bright_yellow())
                         );
                     }
-                    if let Err(e) = libsnow::homemanager::update::update().await {
+                    if let Err(e) = libsnow::homemanager::update::update(AuthMethod::Sudo).await {
                         eprintln!(
                             "{} {}",
                             "error:"
@@ -301,7 +306,10 @@ async fn main() {
                     }
                 } else if home {
                     check_home_manager();
-                    if let Err(e) = libsnow::homemanager::rebuild::rebuild().await {
+                    if let Err(e) =
+                        libsnow::homemanager::rebuild::rebuild(libsnow::nixos::AuthMethod::Sudo)
+                            .await
+                    {
                         eprintln!(
                             "{} {}",
                             "error:".if_supports_color(Stdout, |t| t.style(*ERRORSTYLE)),
@@ -510,6 +518,13 @@ async fn main() {
 }
 
 fn check_home_manager() {
+    let config = libsnow::config::configfile::get_config();
+    if let Ok(config) = config
+        && config.home_config_file.is_some()
+    {
+        return;
+    }
+
     if !home_manager_installed() {
         eprintln!(
             "{} Home Manager is not installed. Please install it first.",
